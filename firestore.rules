@@ -1,0 +1,352 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+
+    function isBootstrapAdmin() {
+      return signedIn() &&
+        request.auth.token.email == 'dmbogo20@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    function hasProfile() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function verified() { return request.auth.token.email_verified == true; }
+
+    function approved() {
+      return isBootstrapAdmin() || (hasProfile() && verified() && me().status == 'approved');
+    }
+    function isApprovedAdmin() {
+      return isBootstrapAdmin() ||
+        (hasProfile() && verified() && me().status == 'approved' && me().role == 'admin');
+    }
+
+    function member(channelId) {
+      return approved() && hasProfile() && (
+        me().channels.hasAny([channelId]) ||
+        (channelId == 'general' && me().channels.hasAny(['General', 'general', '# General'])) ||
+        (channelId == 'finance' && me().channels.hasAny(['Finance Team', 'finance', '# Finance Team'])) ||
+        (channelId == 'it-support' && me().channels.hasAny(['IT Support', 'it-support', '# IT Support'])) ||
+        (channelId == 'executive-board' && me().channels.hasAny(['Executive Board', 'executive-board', '# Executive Board']))
+      );
+    }
+
+    function historyFrom(channelId) {
+      return me().get('historyFrom', {}).get(channelId, timestamp.date(1970, 1, 1));
+    }
+
+    function isSender() { return resource.data.senderId == request.auth.uid; }
+
+    function validEdit() {
+      return isSender() &&
+        resource.data.get('deleted', false) == false &&
+        request.time < resource.data.createdAt + duration.value(15, 'm') &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt']) &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() >= 1 &&
+        request.resource.data.text.size() <= 4000 &&
+        request.resource.data.editedAt == request.time;
+    }
+
+    function validSoftDelete() {
+      return isSender() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'text', 'deletedAt']) &&
+        request.resource.data.deleted == true &&
+        request.resource.data.text == '' &&
+        request.resource.data.deletedAt == request.time;
+    }
+
+    function validModeratorDelete(channelId) {
+      return isApprovedAdmin() && member(channelId) &&
+        resource.data.get('deleted', false) == false &&
+        resource.data.senderId != request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['deleted', 'text', 'deletedAt', 'deletedBy', 'deletedReason']) &&
+        request.resource.data.deleted == true &&
+        request.resource.data.text == '' &&
+        request.resource.data.deletedAt == request.time &&
+        request.resource.data.deletedBy == 'admin' &&
+        request.resource.data.deletedReason is string &&
+        request.resource.data.deletedReason.size() <= 60;
+    }
+
+    function validMessageCreate() {
+      return request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() <= 4000 &&
+        (request.resource.data.text.size() >= 1 ||
+         request.resource.data.get('type', 'text') == 'file') &&
+        (request.resource.data.get('type', 'text') != 'file' || (
+           request.resource.data.fileId is string &&
+           request.resource.data.fileName is string &&
+           request.resource.data.fileName.size() <= 120 &&
+           request.resource.data.fileType is string &&
+           request.resource.data.fileSize is number &&
+           request.resource.data.fileSize <= 700000 &&
+           request.resource.data.text.size() <= 500)) &&
+        request.resource.data.createdAt == request.time &&
+        (!('replyTo' in request.resource.data) ||
+            (request.resource.data.replyTo.preview is string &&
+             request.resource.data.replyTo.preview.size() <= 140));
+    }
+
+    function validFileDoc() {
+      return request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.fileName is string &&
+        request.resource.data.fileName.size() <= 120 &&
+        request.resource.data.fileType in [
+          'image/png', 'image/jpeg', 'image/webp', 'image/gif',
+          'application/pdf', 'text/plain', 'text/csv',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        ] &&
+        request.resource.data.fileSize is number &&
+        request.resource.data.fileSize <= 700000 &&
+        request.resource.data.data is string &&
+        request.resource.data.data.size() <= 900000 &&
+        request.resource.data.createdAt == request.time;
+    }
+
+    // Receipts: only deliveredTo and readBy may change, and a user may only add
+    // their own uid, never remove entries or add other people.
+    function validReceiptUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['deliveredTo', 'readBy']) &&
+        request.resource.data.deliveredTo is list &&
+        request.resource.data.readBy is list &&
+        request.resource.data.deliveredTo.toSet()
+          .difference(resource.data.deliveredTo.toSet()).hasOnly([request.auth.uid]) &&
+        request.resource.data.readBy.toSet()
+          .difference(resource.data.readBy.toSet()).hasOnly([request.auth.uid]) &&
+        resource.data.deliveredTo.toSet()
+          .difference(request.resource.data.deliveredTo.toSet()).size() == 0 &&
+        resource.data.readBy.toSet()
+          .difference(request.resource.data.readBy.toSet()).size() == 0;
+    }
+
+    function meetingFieldsOk(d) {
+      return d.title is string && d.title.size() >= 1 && d.title.size() <= 100 &&
+        d.startsAt is timestamp &&
+        d.durationMinutes is number && d.durationMinutes >= 5 && d.durationMinutes <= 480 &&
+        d.get('link', '').size() <= 200 &&
+        d.get('location', '').size() <= 120 &&
+        d.get('note', '').size() <= 300;
+    }
+
+    function validMeetingCreate() {
+      return meetingFieldsOk(request.resource.data) &&
+        request.resource.data.keys().hasOnly(['title', 'startsAt', 'durationMinutes', 'link',
+          'location', 'note', 'status', 'createdBy', 'createdByName', 'createdAt', 'rsvp']) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.startsAt > request.time &&
+        request.resource.data.status == 'scheduled' &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.rsvp is map;
+    }
+
+    function validMeetingEdit() {
+      return resource.data.createdBy == request.auth.uid &&
+        resource.data.status == 'scheduled' &&
+        meetingFieldsOk(request.resource.data) &&
+        request.resource.data.startsAt > request.time &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['title', 'startsAt', 'durationMinutes', 'link', 'location', 'note', 'editedAt']) &&
+        request.resource.data.editedAt == request.time;
+    }
+
+    function validRsvpUpdate() {
+      return resource.data.status == 'scheduled' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rsvp']) &&
+        request.resource.data.rsvp.diff(resource.data.rsvp).affectedKeys()
+          .hasOnly([request.auth.uid]) &&
+        request.resource.data.rsvp[request.auth.uid] in ['going', 'maybe', 'declined'];
+    }
+
+    function validMeetingCancel() {
+      return (resource.data.createdBy == request.auth.uid || isApprovedAdmin()) &&
+        resource.data.status == 'scheduled' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'cancelledBy', 'cancelledAt']) &&
+        request.resource.data.status == 'cancelled' &&
+        request.resource.data.cancelledBy == request.auth.uid &&
+        request.resource.data.cancelledAt == request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isApprovedAdmin();
+      allow list: if isApprovedAdmin();
+      allow create: if isOwner(userId) && (
+        (request.resource.data.role == 'staff' &&
+         request.resource.data.status == 'pending' &&
+         request.resource.data.channels.size() == 0) ||
+        (isBootstrapAdmin() &&
+         request.resource.data.role == 'admin' &&
+         request.resource.data.status == 'approved')
+      );
+      allow update: if isApprovedAdmin() || (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['role', 'status', 'channels', 'email', 'historyFrom'])
+      );
+      allow delete: if isApprovedAdmin();
+
+      match /myMeetings/{meetingId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    match /auditLogs/{logId} {
+      allow get, list: if isApprovedAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    match /retentionPolicies/{policyId} {
+      allow read: if approved();
+      allow write: if isApprovedAdmin();
+    }
+
+    match /directory/{uid} {
+      allow read: if approved();
+      allow write: if isApprovedAdmin() || (approved() && isOwner(uid));
+    }
+
+    match /channels/{channelId} {
+      allow read: if approved();
+      allow write: if isApprovedAdmin();
+
+      match /messages/{messageId} {
+        allow read: if member(channelId) &&
+          resource.data.createdAt >= historyFrom(channelId);
+        allow create: if member(channelId) && validMessageCreate();
+        allow update: if member(channelId) &&
+          (validReceiptUpdate() || validEdit() || validSoftDelete() || validModeratorDelete(channelId));
+        allow delete: if false;
+      }
+
+      match /typing/{uid} {
+        allow read: if member(channelId);
+        allow create, update: if member(channelId) && request.auth.uid == uid &&
+          request.resource.data.keys().hasOnly(['name', 'updatedAt']) &&
+          request.resource.data.updatedAt == request.time;
+        allow delete: if member(channelId) && request.auth.uid == uid;
+      }
+
+      match /files/{fileId} {
+        allow get: if member(channelId) &&
+          resource.data.createdAt >= historyFrom(channelId);
+        allow list: if false;
+        allow create: if member(channelId) && validFileDoc();
+        allow update: if false;
+        allow delete: if member(channelId) &&
+          (resource.data.senderId == request.auth.uid || isApprovedAdmin());
+      }
+
+      match /meetings/{meetingId} {
+        allow read: if member(channelId);
+        allow create: if member(channelId) && validMeetingCreate();
+        allow update: if member(channelId) &&
+          (validMeetingEdit() || validRsvpUpdate() || validMeetingCancel());
+        allow delete: if false;
+      }
+    }
+
+    match /directChats/{chatId} {
+      // resource == null lets the app check whether a chat exists before creating it
+      allow get: if approved() &&
+        (resource == null || request.auth.uid in resource.data.participants);
+      allow list: if approved() && request.auth.uid in resource.data.participants;
+      allow create: if approved() &&
+        request.resource.data.participants.size() == 2 &&
+        request.auth.uid in request.resource.data.participants;
+      // participants can never change after creation
+      allow update: if approved() &&
+        request.auth.uid in resource.data.participants &&
+        request.resource.data.participants == resource.data.participants;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants;
+        allow create: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants &&
+          validMessageCreate();
+        allow update: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants &&
+          (validReceiptUpdate() || validEdit() || validSoftDelete());
+        allow delete: if false;
+      }
+
+      match /typing/{uid} {
+        allow read: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants;
+        allow create, update: if approved() && request.auth.uid == uid &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants &&
+          request.resource.data.keys().hasOnly(['name', 'updatedAt']) &&
+          request.resource.data.updatedAt == request.time;
+        allow delete: if approved() && request.auth.uid == uid &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants;
+      }
+
+      match /files/{fileId} {
+        allow get: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants;
+        allow list: if false;
+        allow create: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants &&
+          validFileDoc();
+        allow update: if false;
+        allow delete: if approved() && resource.data.senderId == request.auth.uid &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants;
+      }
+
+      match /meetings/{meetingId} {
+        allow read: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants;
+        allow create: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants &&
+          validMeetingCreate();
+        allow update: if approved() &&
+          request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.participants &&
+          (validMeetingEdit() || validRsvpUpdate() || validMeetingCancel());
+        allow delete: if false;
+      }
+    }
+
+    match /reports/{reportId} {
+      allow create: if approved() &&
+        request.resource.data.reporterId == request.auth.uid &&
+        request.resource.data.note.size() <= 500 &&
+        request.resource.data.status == 'open';
+      allow get, list: if isApprovedAdmin();
+      allow update: if isApprovedAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if false;
+    }
+
+    match /historyRequests/{requestId} {
+      allow create: if approved() &&
+        request.resource.data.uid == request.auth.uid &&
+        requestId == request.auth.uid + '_' + request.resource.data.channelId &&
+        request.resource.data.status == 'open' &&
+        request.resource.data.note.size() <= 200;
+      allow get, list: if isApprovedAdmin() ||
+        (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isApprovedAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile in the organization",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "department": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["admin", "team_lead", "staff"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "channels": { "type": "array" },
+        "dateRegistered": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["fullName", "email", "role", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit log entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "actor": { "type": "string", "maxLength": 150 },
+        "action": { "type": "string", "maxLength": 100 },
+        "details": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "enum": ["Approval", "Role change", "Auth", "Purge", "Retention"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["actor", "action", "category"]
+    },
+    "Channel": {
+      "title": "Channel",
+      "description": "Communication channel",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Channel or Direct Chat message",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string", "maxLength": 100 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "createdAt": { "type": "string" },
+        "deliveredTo": { "type": "array" },
+        "readBy": { "type": "array" }
+      },
+      "required": ["senderId", "senderName", "text"]
+    },
+    "DirectChat": {
+      "title": "DirectChat",
+      "description": "One-on-one direct chat metadata between two users",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "lastMessageTime": { "type": "string" }
+      },
+      "required": ["participants"]
+    },
+    "DirectoryEntry": {
+      "title": "DirectoryEntry",
+      "description": "Public staff directory record excluding email addresses",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "maxLength": 100 },
+        "department": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["displayName", "department"]
+    },
+    "RetentionPolicy": {
+      "title": "RetentionPolicy",
+      "description": "Channel data retention policy",
+      "type": "object",
+      "properties": {
+        "channelName": { "type": "string" },
+        "messageExpiry": { "type": "string" },
+        "fileExpiry": { "type": "string" }
+      }
+    },
+    "Meeting": {
+      "title": "Meeting",
+      "description": "Conversation meeting schedule",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "startsAt": { "type": "string", "format": "date-time" },
+        "durationMinutes": { "type": "number" },
+        "location": { "type": "string", "maxLength": 120 },
+        "link": { "type": "string", "maxLength": 200 },
+        "note": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["scheduled", "cancelled"] },
+        "createdBy": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "rsvp": { "type": "object" }
+      },
+      "required": ["title", "startsAt", "durationMinutes", "status", "createdBy", "createdByName", "rsvp"]
+    },
+    "MyMeeting": {
+      "title": "MyMeeting",
+      "description": "User's personal upcoming meeting bookmark",
+      "type": "object",
+      "properties": {
+        "conversationType": { "type": "string", "enum": ["channel", "direct"] },
+        "conversationId": { "type": "string" },
+        "conversationName": { "type": "string" },
+        "title": { "type": "string" },
+        "startsAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["conversationType", "conversationId", "conversationName", "title", "startsAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile document keyed by Firebase Auth UID"
+    },
+    "/users/{userId}/myMeetings/{meetingId}": {
+      "schema": { "$ref": "#/entities/MyMeeting" },
+      "description": "User's personal scheduled meetings list"
+    },
+    "/directory/{uid}": {
+      "schema": { "$ref": "#/entities/DirectoryEntry" },
+      "description": "Public staff directory for direct messaging (no PII/email)"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Append-only administrative and security audit trail"
+    },
+    "/channels/{channelId}": {
+      "schema": { "$ref": "#/entities/Channel" },
+      "description": "Channels metadata"
+    },
+    "/channels/{channelId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Encrypted real-time channel messages"
+    },
+    "/channels/{channelId}/meetings/{meetingId}": {
+      "schema": { "$ref": "#/entities/Meeting" },
+      "description": "Channel meeting schedules"
+    },
+    "/directChats/{chatId}": {
+      "schema": { "$ref": "#/entities/DirectChat" },
+      "description": "Direct conversation records between two users"
+    },
+    "/directChats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Direct conversation messages"
+    },
+    "/directChats/{chatId}/meetings/{meetingId}": {
+      "schema": { "$ref": "#/entities/Meeting" },
+      "description": "Direct conversation meetings"
+    },
+    "/retentionPolicies/{policyId}": {
+      "schema": { "$ref": "#/entities/RetentionPolicy" },
+      "description": "Retention policy configurations"
+    }
+  }
+}

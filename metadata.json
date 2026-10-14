@@ -1,0 +1,6 @@
+{
+  "name": "Group Secure App",
+  "description": "Secure team messaging with role-based access control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

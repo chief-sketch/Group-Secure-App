@@ -49,6 +49,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
     openMeetingConversation,
     isMyMeetingsPageOpen,
     setIsMyMeetingsPageOpen,
+    channelsMap,
   } = useApp();
 
   // Active chat state
@@ -60,6 +61,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
   const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([]);
   const [messageLimit, setMessageLimit] = useState<number>(50);
   const [isLoadingEarlier, setIsLoadingEarlier] = useState<boolean>(false);
+  const [isLoadingActiveMessages, setIsLoadingActiveMessages] = useState<boolean>(false);
 
   // Direct chats from Firestore
   const [directChatsList, setDirectChatsList] = useState<
@@ -185,13 +187,18 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
     const hasAccess = checkAccess(defCh.id, defCh.name);
     const memberCount = getChannelMemberCount(defCh.id, defCh.name);
     const latestInfo = latestMessageMap[defCh.id];
+    const chDoc = channelsMap[defCh.id] || channelsMap[normalizeChannelId(defCh.id)];
     return {
       ...defCh,
       hasAccess,
       memberCount,
       unreadCount: unreadMap[defCh.id] || 0,
-      lastMessage: latestInfo ? latestInfo.preview : '',
+      lastMessage: latestInfo ? latestInfo.preview : (chDoc?.clearedAt ? 'Channel cleared by administrator' : ''),
       lastMessageTime: latestInfo ? latestInfo.time : '',
+      clearedAt: chDoc?.clearedAt,
+      clearedBy: chDoc?.clearedBy,
+      clearedByName: chDoc?.clearedByName,
+      clearedReason: chDoc?.clearedReason,
       messages: activeChatId === defCh.id ? activeMessages : [],
     };
   });
@@ -290,19 +297,32 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
   useEffect(() => {
     if (!activeChatId) {
       setActiveMessages([]);
+      setIsLoadingActiveMessages(false);
       return;
     }
 
     const isChan = activeConversationType === 'channel';
     if (isChan && !checkAccess(activeChatId)) {
       setActiveMessages([]);
+      setIsLoadingActiveMessages(false);
       return;
     }
+
+    setIsLoadingActiveMessages(true);
 
     const historyTimestamp =
       isChan && activeHistoryMillis > 0
         ? Timestamp.fromMillis(activeHistoryMillis)
         : undefined;
+
+    const chDoc = activeChatId ? (channelsMap[activeChatId] || channelsMap[normalizeChannelId(activeChatId)]) : undefined;
+    let clearedAtTimestamp: Timestamp | undefined = undefined;
+    if (isChan && chDoc?.clearedAt) {
+      if (chDoc.clearedAt instanceof Timestamp) clearedAtTimestamp = chDoc.clearedAt;
+      else if (typeof chDoc.clearedAt.toMillis === 'function') clearedAtTimestamp = chDoc.clearedAt;
+      else if (typeof chDoc.clearedAt.seconds === 'number') clearedAtTimestamp = Timestamp.fromMillis(chDoc.clearedAt.seconds * 1000);
+      else if (chDoc.clearedAt instanceof Date) clearedAtTimestamp = Timestamp.fromDate(chDoc.clearedAt);
+    }
 
     const unsub = subscribeToConversationMessages(
       activeConversationType,
@@ -312,6 +332,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
       (newMsgs) => {
         setActiveMessages(newMsgs);
         setIsLoadingEarlier(false);
+        setIsLoadingActiveMessages(false);
 
         if (newMsgs.length > 0) {
           const latest = newMsgs[newMsgs.length - 1];
@@ -339,15 +360,17 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
       (err) => {
         console.warn('Could not load messages for', activeChatId, err);
         setIsLoadingEarlier(false);
+        setIsLoadingActiveMessages(false);
       },
       true,
-      historyTimestamp
+      historyTimestamp,
+      clearedAtTimestamp
     );
 
     return () => {
       unsub();
     };
-  }, [activeChatId, activeConversationType, messageLimit, user.uid, activeHistoryMillis]);
+  }, [activeChatId, activeConversationType, messageLimit, user.uid, activeHistoryMillis, channelsMap]);
 
   // When window becomes active, mark unread messages in the active chat as read
   useEffect(() => {
@@ -378,6 +401,10 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
     () => directChatsList.map((d) => d.id).sort().join(','),
     [directChatsList]
   );
+  const userChannelsKey = useMemo(
+    () => (user.channels || []).slice().sort().join(','),
+    [user.channels]
+  );
 
   // 5. Background Unread Counts and New Message Notification Toasts
   useEffect(() => {
@@ -390,6 +417,14 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
     channels.forEach((ch) => {
       if (!ch.hasAccess) return;
       const chHistoryTs = getChannelHistoryFromTimestamp(user.historyFrom, ch.id);
+      const chDoc = channelsMap[ch.id] || channelsMap[normalizeChannelId(ch.id)];
+      let chClearedAtTs: Timestamp | undefined = undefined;
+      if (chDoc?.clearedAt) {
+        if (chDoc.clearedAt instanceof Timestamp) chClearedAtTs = chDoc.clearedAt;
+        else if (typeof chDoc.clearedAt.toMillis === 'function') chClearedAtTs = chDoc.clearedAt;
+        else if (typeof chDoc.clearedAt.seconds === 'number') chClearedAtTs = Timestamp.fromMillis(chDoc.clearedAt.seconds * 1000);
+        else if (chDoc.clearedAt instanceof Date) chClearedAtTs = Timestamp.fromDate(chDoc.clearedAt);
+      }
       const unsub = subscribeToConversationMessages(
         'channel',
         ch.id,
@@ -447,7 +482,8 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
         },
         undefined,
         false,
-        chHistoryTs
+        chHistoryTs,
+        chClearedAtTs
       );
       unsubs.push(unsub);
     });
@@ -518,7 +554,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
     return () => {
       unsubs.forEach((u) => u());
     };
-  }, [user.uid, historyFromKey, directChatsKey, notificationsEnabled]);
+  }, [user.uid, historyFromKey, directChatsKey, userChannelsKey, notificationsEnabled, channelsMap]);
 
   // Live member notification when an administrator approves or declines their history request
   const lastKnownHistoryReqStatusRef = useRef<Record<string, string>>({});
@@ -764,7 +800,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#0B141A] text-[#E9EDEF] flex overflow-hidden font-sans antialiased p-0 m-0 relative">
+    <div className="h-screen h-[100dvh] w-screen bg-[#0B141A] text-[#E9EDEF] flex overflow-hidden font-sans antialiased p-0 m-0 relative">
       {/* Toast Notification */}
       {toastMessage && (
         <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
@@ -846,6 +882,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ user, onLogout }) => {
             onLoadEarlier={handleLoadEarlier}
             hasEarlierMessages={activeMessages.length >= messageLimit}
             isLoadingEarlier={isLoadingEarlier}
+            isLoadingMessages={isLoadingActiveMessages}
           />
         ) : (
           <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 text-center bg-[#111B21] border-l border-white/[0.04] select-none">

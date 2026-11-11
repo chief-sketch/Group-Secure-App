@@ -216,10 +216,10 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
             <button
               type="button"
               onClick={handleAddToCalendar}
-              className="min-h-[36px] px-2.5 py-1 text-[11px] font-medium text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.06] rounded-[6px] border border-white/[0.06] flex items-center gap-1.5 transition-standard cursor-pointer"
+              className="min-h-[44px] sm:min-h-[36px] px-3 py-1.5 sm:px-2.5 sm:py-1 text-[12px] sm:text-[11px] font-medium text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.06] rounded-[6px] border border-white/[0.06] flex items-center gap-1.5 transition-standard cursor-pointer"
               title="Download .ics calendar event"
             >
-              <CalendarPlus className="w-3.5 h-3.5 text-[#00A884]" />
+              <CalendarPlus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#00A884]" />
               <span>Add to calendar</span>
             </button>
           )}
@@ -296,7 +296,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
                 type="button"
                 disabled={isRsvpUpdating}
                 onClick={() => handleRsvpClick('going')}
-                className={`min-h-[38px] px-3 py-1.5 rounded-[6px] text-[12px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 sm:px-3 py-2 sm:py-1.5 rounded-[6px] text-[12px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer ${
                   userRsvp === 'going'
                     ? 'bg-[#00A884] text-white font-semibold shadow-sm'
                     : 'bg-white/[0.05] text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.08]'
@@ -310,7 +310,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
                 type="button"
                 disabled={isRsvpUpdating}
                 onClick={() => handleRsvpClick('maybe')}
-                className={`min-h-[38px] px-3 py-1.5 rounded-[6px] text-[12px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 sm:px-3 py-2 sm:py-1.5 rounded-[6px] text-[12px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer ${
                   userRsvp === 'maybe'
                     ? 'bg-[#F59E0B] text-black font-semibold shadow-sm'
                     : 'bg-white/[0.05] text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.08]'
@@ -324,7 +324,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
                 type="button"
                 disabled={isRsvpUpdating}
                 onClick={() => handleRsvpClick('declined')}
-                className={`min-h-[38px] px-3 py-1.5 rounded-[6px] text-[12px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer ${
+                className={`min-h-[44px] sm:min-h-[38px] px-3.5 sm:px-3 py-2 sm:py-1.5 rounded-[6px] text-[12px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer ${
                   userRsvp === 'declined'
                     ? 'bg-[#E5484D] text-white font-semibold shadow-sm'
                     : 'bg-white/[0.05] text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.08]'
@@ -335,13 +335,13 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
               </button>
             </div>
 
-            {/* Creator / Admin actions: Edit & Cancel */}
+            {/* Creator / Admin actions: Edit & Cancel (44px tap area) */}
             <div className="flex items-center gap-1 flex-shrink-0">
               {canEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit(meeting)}
-                  className="min-h-[38px] min-w-[38px] flex items-center justify-center text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.06] rounded-[6px] transition-standard cursor-pointer"
+                  className="min-h-[44px] min-w-[44px] sm:min-h-[38px] sm:min-w-[38px] flex items-center justify-center text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.06] rounded-[6px] transition-standard cursor-pointer"
                   title="Edit meeting"
                   aria-label="Edit meeting"
                 >
@@ -352,7 +352,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsCancelDialogOpen(true)}
-                  className="min-h-[38px] min-w-[38px] flex items-center justify-center text-[#8696A0] hover:text-[#E5484D] hover:bg-[#E5484D]/10 rounded-[6px] transition-standard cursor-pointer"
+                  className="min-h-[44px] min-w-[44px] sm:min-h-[38px] sm:min-w-[38px] flex items-center justify-center text-[#8696A0] hover:text-[#E5484D] hover:bg-[#E5484D]/10 rounded-[6px] transition-standard cursor-pointer"
                   title="Cancel meeting"
                   aria-label="Cancel meeting"
                 >

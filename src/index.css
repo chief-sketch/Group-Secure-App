@@ -1,21 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --color-bg-app: #0B141A;
-  --color-bg-card: #1F2C33;
-  --color-bg-surface: #111B21;
-  --color-bg-input: #2A3942;
-  --color-bg-hover: #202C33;
-  --color-bg-active: #233138;
-  --color-text-primary: #E9EDEF;
-  --color-text-secondary: #8696A0;
-  --color-accent: #00A884;
-  --color-accent-hover: #008F72;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  color-scheme: dark;
+  --color-bg-app: #0B1419;
+  --color-bg-card: #17232A;
+  --color-bg-surface: #111C22;
+  --color-bg-input: #22323B;
+  --color-bg-hover: #1E2D35;
+  --color-bg-active: #24353F;
+  --color-text-primary: #F2F7F9;
+  --color-text-secondary: #A9BAC4;
+  --color-accent: #3DDBB4;
+  --color-accent-hover: #2EE0B0;
+  --color-border: #2C3B44;
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+
+  /* Shared motion tokens */
+  --dur-press: 100ms;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-enter: 350ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --color-bg-app: #F0F2F5;
   --color-bg-card: #FFFFFF;
   --color-bg-surface: #F8F9FA;
@@ -26,16 +36,41 @@
   --color-text-secondary: #54656F;
   --color-accent: #008069;
   --color-accent-hover: #006D5B;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-border-subtle: rgba(0, 0, 0, 0.04);
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-subtle: rgba(0, 0, 0, 0.05);
 }
 
 @layer base {
   *,
   *::before,
   *::after {
-    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    height: 100dvh;
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+    font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500;
+  }
+
+  /* Smooth light/dark mode color transitions avoiding abrupt brightness jumps */
+  body,
+  #root,
+  aside,
+  main,
+  header,
+  nav {
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
   }
 
   button,
@@ -43,17 +78,19 @@
   textarea,
   select {
     font-family: inherit;
+    font-weight: inherit;
   }
 
-  /* Keyboard accessible focus outline (no glow) */
+  /* Keyboard accessible visible 2px teal focus ring */
   :focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+    outline: 2px solid #3DDBB4 !important;
+    outline-offset: 2px !important;
   }
 }
 
 body {
-  font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 500;
   margin: 0;
   padding: 0;
   background-color: var(--color-bg-app);
@@ -64,110 +101,454 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-[data-theme="light"] .bg-\[\#0B141A\] {
-  background-color: var(--color-bg-app) !important;
+/* Safe area padding utilities for mobile devices with home indicator / notch */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 
-[data-theme="light"] .bg-\[\#1F2C33\] {
-  background-color: var(--color-bg-card) !important;
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top, 0px), 8px);
 }
 
-[data-theme="light"] .bg-\[\#111B21\] {
-  background-color: var(--color-bg-surface) !important;
+.h-dvh-screen {
+  height: 100vh;
+  height: 100dvh;
 }
 
-[data-theme="light"] .bg-\[\#2A3942\] {
-  background-color: var(--color-bg-input) !important;
+/* ==========================================================================
+   1. Typography Scale (Montserrat)
+   ========================================================================== */
+h1,
+.text-heading-xl,
+.text-\[24px\],
+.text-\[26px\],
+.text-\[28px\],
+.text-\[30px\],
+.text-\[32px\] {
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
 }
 
-[data-theme="light"] .bg-\[\#202C33\] {
-  background-color: var(--color-bg-hover) !important;
+h2,
+h3,
+.text-heading-lg,
+.text-\[18px\],
+.text-\[20px\],
+.text-\[22px\] {
+  letter-spacing: -0.01em !important;
+  line-height: 1.25 !important;
 }
 
-[data-theme="light"] .bg-\[\#223038\],
-[data-theme="light"] .bg-\[\#233138\] {
-  background-color: var(--color-bg-card) !important;
+body,
+p,
+.text-body,
+.text-\[13px\],
+.text-\[14px\],
+.text-\[15px\],
+.text-\[16px\] {
+  letter-spacing: 0;
+  line-height: 1.5;
 }
 
-[data-theme="light"] .text-\[\#E9EDEF\] {
-  color: var(--color-text-primary) !important;
+.text-micro,
+.text-\[10px\],
+.text-\[11px\],
+.text-\[12px\] {
+  letter-spacing: 0.01em;
 }
 
-[data-theme="light"] .text-\[\#8696A0\] {
-  color: var(--color-text-secondary) !important;
-}
-
-[data-theme="light"] .text-\[\#00A884\] {
-  color: var(--color-accent) !important;
-}
-
-[data-theme="light"] .bg-\[\#00A884\] {
-  background-color: var(--color-accent) !important;
-}
-
-[data-theme="light"] .bg-\[\#008F72\],
-[data-theme="light"] .hover\:bg-\[\#008F72\]:hover {
-  background-color: var(--color-accent-hover) !important;
-}
-
-[data-theme="light"] .border-white\/\[0\.08\],
-[data-theme="light"] .border-white\/\[0\.06\],
-[data-theme="light"] .border-white\/\[0\.04\],
-[data-theme="light"] .border-white\/\[0\.1\],
-[data-theme="light"] .border-white\/\[0\.12\] {
-  border-color: var(--color-border) !important;
-}
-
-[data-theme="light"] .divide-white\/\[0\.08\],
-[data-theme="light"] .divide-white\/\[0\.06\],
-[data-theme="light"] .divide-white\/\[0\.04\] {
-  border-color: var(--color-border-subtle) !important;
-}
-
-/* Tabular figures for stats, unread counts, timestamps */
+/* Tabular figures for stats, unread counts, timestamps, countdowns */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Typography tracking rules */
-.title-tracking {
-  letter-spacing: -0.01em;
+/* ==========================================================================
+   2. Instant Press Feedback & Micro-interactions
+   ========================================================================== */
+
+/* Universal button press: scale to 0.97 on pointer down with 100ms ease-out */
+button:not(:disabled):not(.no-press-scale),
+[role="button"]:not([aria-disabled="true"]):not(.no-press-scale) {
+  transition: transform 100ms ease-out, background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
 }
 
-.label-tracking {
-  letter-spacing: 0.02em;
+button:not(:disabled):not(.no-press-scale):active,
+[role="button"]:not([aria-disabled="true"]):not(.no-press-scale):active {
+  transform: scale(0.97);
 }
 
-/* 150ms smooth transition utility */
+/* Nav items and list rows: instant background highlight on press, no scale */
+.nav-row,
+.chat-row,
+.list-row,
+[data-pressable-row="true"] {
+  transform: none !important;
+  transition: background-color 80ms ease, border-color 80ms ease, color 80ms ease !important;
+}
+
+.nav-row:active,
+.chat-row:active,
+.list-row:active,
+[data-pressable-row="true"]:active {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  transform: none !important;
+}
+
+[data-theme="light"] .nav-row:active,
+[data-theme="light"] .chat-row:active,
+[data-theme="light"] .list-row:active,
+[data-theme="light"] [data-pressable-row="true"]:active {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Clickable card hover and active transitions */
+.clickable-card {
+  transition: transform 100ms ease-out, border-color 150ms ease, background-color 150ms ease;
+}
+
+.clickable-card:hover {
+  border-color: rgba(61, 219, 180, 0.4);
+}
+
+.clickable-card:active {
+  transform: scale(0.985);
+}
+
+/* Smooth transition utility */
 .transition-standard {
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
 }
 
-/* Skeleton pulse at restrained low contrast */
-@keyframes pulse-subtle {
-  0%, 100% {
-    opacity: 0.4;
+/* ==========================================================================
+   3. Modal, Scrim & Menu Popover Motion
+   ========================================================================== */
+
+@keyframes modalScrimFadeIn {
+  from {
+    opacity: 0;
   }
-  50% {
-    opacity: 0.8;
+  to {
+    opacity: 1;
   }
 }
 
-.skeleton-block {
-  background-color: #202C33;
-  animation: pulse-subtle 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  border-radius: 10px;
+@keyframes modalScaleFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-/* Respect prefers-reduced-motion */
+.modal-scrim-animate {
+  animation: modalScrimFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: auto;
+}
+
+.modal-content-animate {
+  animation: modalScaleFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: center center;
+  pointer-events: auto;
+}
+
+@keyframes menuPopoverFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.menu-popover-animate {
+  animation: menuPopoverFadeIn 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: auto;
+}
+
+/* Slide in right / left for drawers */
+@keyframes slideInRightAnim {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeftAnim {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRightAnim 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeftAnim 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ==========================================================================
+   Motion System: Keyframes and Micro-Interactions
+   ========================================================================== */
+
+/* Card shake for failed login: 6px horizontal, 3 oscillations, 300ms */
+@keyframes cardShake {
+  0%, 100% { transform: translateX(0); }
+  16.6% { transform: translateX(-6px); }
+  33.3% { transform: translateX(6px); }
+  50% { transform: translateX(-6px); }
+  66.6% { transform: translateX(6px); }
+  83.3% { transform: translateX(-3px); }
+}
+
+.card-shake {
+  animation: cardShake 300ms var(--ease-out) forwards;
+  will-change: transform;
+}
+
+/* Login screen entrance stagger rise: 8px rise with fade */
+@keyframes loginStaggerRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-login-stagger {
+  animation: loginStaggerRise var(--dur-enter) var(--ease-out) both;
+}
+
+/* New message animation: 6px slide + fade in, 150ms ease-out */
+@keyframes messageSlideInOutgoing {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes messageSlideInIncoming {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-message-outgoing {
+  animation: messageSlideInOutgoing var(--dur-fast) var(--ease-out) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-message-incoming {
+  animation: messageSlideInIncoming var(--dur-fast) var(--ease-out) forwards;
+  will-change: transform, opacity;
+}
+
+/* Unread badge: fade in and scale 0.8 to 1 over 150ms */
+@keyframes badgePop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-badge-pop {
+  animation: badgePop var(--dur-fast) var(--ease-out) forwards;
+  transform-origin: center;
+}
+
+/* Badge pulse once or twice when count increases */
+@keyframes badgePulseOnce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.animate-badge-pulse {
+  animation: badgePulseOnce 350ms var(--ease-out) 2;
+  transform-origin: center;
+}
+
+/* Subtle moving sheen shimmer for skeletons (1.5s loop) */
+@keyframes shimmerAnim {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #17232A;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 100%
+  );
+  animation: shimmerAnim 1.5s infinite linear;
+}
+
+/* Simple 150ms crossfade */
+@keyframes crossFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-crossfade {
+  animation: crossFadeIn var(--dur-fast) var(--ease-out) forwards;
+}
+
+/* ==========================================================================
+   4. Accessibility: prefers-reduced-motion
+   ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 150ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 150ms !important;
     scroll-behavior: auto !important;
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  .clickable-card:active {
+    transform: none !important;
+  }
+
+  .card-shake {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .animate-login-stagger {
+    animation: modalScrimFadeIn 150ms ease forwards !important;
+    transform: none !important;
+  }
+
+  .animate-message-outgoing,
+  .animate-message-incoming {
+    animation: modalScrimFadeIn 150ms ease forwards !important;
+    transform: none !important;
+  }
+
+  .animate-badge-pop,
+  .animate-badge-pulse {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .skeleton-shimmer::after {
+    animation: none !important;
+  }
+
+  .modal-content-animate {
+    animation: modalScrimFadeIn 150ms ease forwards !important;
+    transform: none !important;
+  }
+
+  .menu-popover-animate {
+    animation: modalScrimFadeIn 150ms ease forwards !important;
+    transform: none !important;
+  }
+
+  .animate-slideInRight,
+  .animate-slideInLeft {
+    animation: modalScrimFadeIn 150ms ease forwards !important;
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   5. Accessibility: prefers-reduced-transparency
+   ========================================================================== */
+@media (prefers-reduced-transparency: reduce) {
+  .bg-black\/60,
+  .bg-black\/70,
+  .bg-black\/80,
+  .bg-black\/90,
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .bg-black\/60 {
+    background-color: #0B1419 !important;
+  }
+
+  .bg-\[\#1F2C33\]\/40,
+  .bg-\[\#173A33\]\/30,
+  .bg-\[\#173A33\]\/20,
+  .bg-white\/\[0\.04\],
+  .bg-white\/\[0\.03\],
+  .bg-white\/\[0\.02\] {
+    background-color: #17232A !important;
+  }
+}
+
+/* ==========================================================================
+   6. Accessibility: prefers-contrast: more
+   ========================================================================== */
+@media (prefers-contrast: more) {
+  :root {
+    --color-border: #6B7F8B !important;
+    --color-text-secondary: #C9D6DD !important;
+  }
+
+  .text-\[\#8696A0\],
+  .text-\[\#A9BAC4\],
+  .text-\[\#6B7D87\] {
+    color: #C9D6DD !important;
+  }
+
+  .border-\[\#2C3B44\],
+  .border-white\/\[0\.08\],
+  .border-white\/\[0\.06\],
+  .border-white\/\[0\.04\],
+  .border-white\/\[0\.1\],
+  .border-white\/\[0\.12\] {
+    border-color: #6B7F8B !important;
+  }
+
+  input,
+  textarea,
+  button,
+  [role="button"],
+  .rounded-\[16px\],
+  .rounded-\[12px\] {
+    border-color: #6B7F8B !important;
   }
 }
 

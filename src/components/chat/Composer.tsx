@@ -30,6 +30,7 @@ interface ComposerProps {
   onSaveEdit?: (messageId: string, newText: string) => Promise<void>;
   onTyping?: () => void;
   onClearTyping?: () => void;
+  placeholder?: string;
 }
 
 export const Composer: React.FC<ComposerProps> = ({
@@ -43,6 +44,7 @@ export const Composer: React.FC<ComposerProps> = ({
   onSaveEdit,
   onTyping,
   onClearTyping,
+  placeholder,
 }) => {
   const { showToast } = useApp();
   const [text, setText] = useState('');
@@ -61,7 +63,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
   // Typing throttle and inactivity timeout refs
   const lastTypingSentRef = useRef<number>(0);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Close attach menu on outside click
   useEffect(() => {
@@ -287,7 +289,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const canSend = text.trim().length > 0 && !disabled && !isProcessingFile;
 
   return (
-    <div className="bg-[#202C33] border-t border-white/[0.06] flex flex-col flex-shrink-0 relative">
+    <div className="bg-[#0F1D24] border-t border-white/[0.06] flex flex-col flex-shrink-0 relative pb-safe">
       {/* Hidden file inputs */}
       <input
         ref={photoInputRef}
@@ -314,11 +316,11 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* REPLY BAR ABOVE COMPOSER */}
       {replyingTo && !editingMessage && (
-        <div className="px-4 py-2 bg-[#172228] border-b border-white/[0.06] flex items-center justify-between gap-3 text-[13px] animate-fadeIn select-none">
-          <div className="flex items-center gap-2.5 min-w-0 border-l-[3px] border-[#00A884] pl-2.5">
-            <Reply className="w-4 h-4 text-[#00A884] flex-shrink-0" />
+        <div className="px-4 py-2 bg-[#12242B] border-b border-white/[0.06] flex items-center justify-between gap-3 text-[13px] animate-fadeIn select-none">
+          <div className="flex items-center gap-2.5 min-w-0 border-l-[3px] border-[#20E39F] pl-2.5">
+            <Reply className="w-4 h-4 text-[#20E39F] flex-shrink-0" />
             <div className="min-w-0">
-              <div className="text-[12px] font-semibold text-[#00A884] truncate">
+              <div className="text-[12px] font-semibold text-[#20E39F] truncate">
                 Replying to {replyingTo.senderName}
               </div>
               <div className="text-[12px] text-[#8696A0] truncate max-w-[450px]">
@@ -340,11 +342,11 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* EDITING BAR ABOVE COMPOSER */}
       {editingMessage && (
-        <div className="px-4 py-2 bg-[#172228] border-b border-white/[0.06] flex items-center justify-between gap-3 text-[13px] animate-fadeIn select-none">
-          <div className="flex items-center gap-2.5 min-w-0 border-l-[3px] border-[#00A884] pl-2.5">
-            <Pencil className="w-4 h-4 text-[#00A884] flex-shrink-0" />
+        <div className="px-4 py-2 bg-[#12242B] border-b border-white/[0.06] flex items-center justify-between gap-3 text-[13px] animate-fadeIn select-none">
+          <div className="flex items-center gap-2.5 min-w-0 border-l-[3px] border-[#20E39F] pl-2.5">
+            <Pencil className="w-4 h-4 text-[#20E39F] flex-shrink-0" />
             <div className="min-w-0">
-              <div className="text-[12px] font-semibold text-[#00A884]">Editing message</div>
+              <div className="text-[12px] font-semibold text-[#20E39F]">Editing message</div>
               <div className="text-[12px] text-[#8696A0] truncate max-w-[450px]">
                 {editingMessage.text}
               </div>
@@ -367,7 +369,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* SECTION 2: PREVIEW PANEL BEFORE SENDING */}
       {stagedFile && (
-        <div className="p-3 bg-[#182229] border-b border-white/[0.08] flex flex-col gap-2.5 animate-fadeIn select-none">
+        <div className="p-3 bg-[#14262E] border-b border-white/[0.08] flex flex-col gap-2.5 animate-fadeIn select-none">
           <div className="flex items-center justify-between gap-3">
             {/* File Thumbnail or Icon + Details */}
             <div className="flex items-center gap-3 min-w-0">
@@ -385,7 +387,7 @@ export const Composer: React.FC<ComposerProps> = ({
                   />
                 </div>
               ) : (
-                <div className="w-12 h-12 rounded-[8px] bg-[#223038] border border-white/[0.1] flex items-center justify-center text-[#00A884] flex-shrink-0">
+                <div className="w-12 h-12 rounded-[8px] bg-[#162D3D] border border-white/[0.1] flex items-center justify-center text-[#20E39F] flex-shrink-0">
                   <FileText className="w-6 h-6" strokeWidth={1.75} />
                 </div>
               )}
@@ -415,7 +417,7 @@ export const Composer: React.FC<ComposerProps> = ({
             </button>
           </div>
 
-          {/* Caption Input Row with Green Send Button */}
+          {/* Caption Input Row with Mint Send Button */}
           <div className="flex items-center gap-2 pt-1 border-t border-white/[0.04]">
             <div className="flex-1 relative flex items-center">
               <input
@@ -430,7 +432,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     handleSendStagedFile();
                   }
                 }}
-                className="w-full h-[36px] px-3 pr-14 rounded-[8px] bg-[#223038] text-[#E9EDEF] placeholder-[#8696A0] text-[13px] border border-transparent focus:border-[#00A884] focus:outline-none"
+                className="w-full h-[36px] px-3 pr-14 rounded-[10px] bg-[#16252C] text-[#E9EDEF] placeholder-[#6B7D87] text-base sm:text-[13px] border border-transparent focus:border-[#20E39F] focus:outline-none"
               />
               {fileCaption.length > 0 && (
                 <span className="absolute right-3 text-[10px] text-[#8696A0] font-mono tabular-nums pointer-events-none">
@@ -439,16 +441,16 @@ export const Composer: React.FC<ComposerProps> = ({
               )}
             </div>
 
-            {/* Green Send Button */}
+            {/* Mint Send Button */}
             <button
               type="button"
               onClick={handleSendStagedFile}
-              className="h-[36px] px-4 rounded-[8px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer flex-shrink-0 shadow-sm"
+              className="h-[36px] px-4 rounded-[10px] bg-[#20E39F] hover:bg-[#1CD392] text-[#0A1A14] text-[13px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer flex-shrink-0 shadow-sm"
               title="Send file"
               aria-label="Send file"
             >
               <span>Send</span>
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-3.5 h-3.5 fill-current" />
             </button>
           </div>
         </div>
@@ -456,7 +458,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Processing Loader Banner */}
       {isProcessingFile && (
-        <div className="px-4 py-2 bg-[#172228] border-b border-white/[0.06] flex items-center gap-2 text-[#00A884] text-[12px] animate-fadeIn select-none">
+        <div className="px-4 py-2 bg-[#12242B] border-b border-white/[0.06] flex items-center gap-2 text-[#20E39F] text-[12px] animate-fadeIn select-none font-medium">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           <span>Processing file in browser...</span>
         </div>
@@ -464,14 +466,14 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Input controls row (when not staging a file) */}
       {!stagedFile && (
-        <div className="px-3 sm:px-4 py-2.5 flex items-end gap-2 sm:gap-3">
+        <div className="px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-3">
           {/* Paperclip button with attachment menu */}
           <div className="relative" ref={attachMenuRef}>
             <button
               type="button"
               onClick={() => setShowAttachMenu((prev) => !prev)}
               disabled={disabled || isProcessingFile || !!editingMessage}
-              className="h-[44px] w-[40px] flex items-center justify-center text-[#8696A0] hover:text-[#00A884] transition-standard rounded-[8px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="h-[40px] w-[40px] flex items-center justify-center text-[#6B7D87] hover:text-[#20E39F] hover:bg-white/[0.04] transition-colors rounded-[10px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               title="Attach photo or document"
               aria-label="Attach photo or document"
             >
@@ -480,16 +482,16 @@ export const Composer: React.FC<ComposerProps> = ({
 
             {/* Attach Menu: Photo and Document */}
             {showAttachMenu && (
-              <div className="absolute left-0 bottom-full mb-2 z-40 bg-[#233138] rounded-[8px] border border-white/[0.08] shadow-xl py-1.5 w-40 select-none animate-fadeIn">
+              <div className="absolute left-0 bottom-full mb-2 z-40 bg-[#18262E] rounded-[12px] border border-white/[0.08] shadow-2xl py-1.5 w-40 select-none origin-bottom-left menu-popover-animate">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAttachMenu(false);
                     photoInputRef.current?.click();
                   }}
-                  className="w-full px-3.5 py-2 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
-                  <ImageIcon className="w-4 h-4 text-[#00A884]" />
+                  <ImageIcon className="w-4 h-4 text-[#20E39F]" />
                   <span>Photo</span>
                 </button>
                 <button
@@ -498,17 +500,17 @@ export const Composer: React.FC<ComposerProps> = ({
                     setShowAttachMenu(false);
                     docInputRef.current?.click();
                   }}
-                  className="w-full px-3.5 py-2 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
-                  <FileText className="w-4 h-4 text-[#00A884]" />
+                  <FileText className="w-4 h-4 text-[#20E39F]" />
                   <span>Document</span>
                 </button>
               </div>
             )}
           </div>
 
-          {/* Message input */}
-          <div className="flex-1 relative bg-[#26353D] rounded-[10px] border border-white/[0.08] focus-within:border-[#00A884] transition-standard flex items-center px-3 py-1">
+          {/* Message input container */}
+          <div className="flex-1 relative bg-[#16252C] rounded-[14px] border border-white/[0.06] focus-within:border-[#20E39F]/50 transition-standard flex items-center px-4 py-1.5">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -518,7 +520,7 @@ export const Composer: React.FC<ComposerProps> = ({
                   ? 'You do not have access to send messages in this channel'
                   : editingMessage
                   ? 'Edit message...'
-                  : 'Type a message'
+                  : placeholder || 'Type a message'
               }
               value={text}
               onChange={handleTextChange}
@@ -526,34 +528,34 @@ export const Composer: React.FC<ComposerProps> = ({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               disabled={disabled}
-              className="w-full bg-transparent text-[#E9EDEF] placeholder-[#8696A0] text-[14px] leading-relaxed resize-none focus:outline-none max-h-[130px] py-1.5 scrollbar-thin"
+              className="w-full bg-transparent text-[#E9EDEF] placeholder-[#6B7D87] text-base sm:text-[14px] font-medium leading-relaxed resize-none focus:outline-none max-h-[130px] py-1.5 scrollbar-thin"
             />
 
             {/* Subtle keyboard shortcut hint on desktop when focused & empty */}
             {isFocused && !text.trim() && !disabled && (
-              <span className="hidden lg:inline text-[11px] text-[#8696A0]/80 select-none absolute right-3 pointer-events-none">
-                Press Enter to send, Shift+Enter for new line
+              <span className="hidden lg:inline text-[11px] text-[#6B7D87] select-none absolute right-4 pointer-events-none font-medium">
+                Enter to send
               </span>
             )}
           </div>
 
-          {/* Send button (Primary solid green, 44px) */}
+          {/* Send button matching mockup: Mint rounded square w-[42px] h-[42px] rounded-[12px] */}
           <button
             type="button"
             onClick={handleSend}
             disabled={!canSend}
-            className={`w-[44px] h-[44px] rounded-full flex items-center justify-center text-white transition-standard flex-shrink-0 ${
+            className={`w-[42px] h-[42px] rounded-[12px] flex items-center justify-center transition-all flex-shrink-0 ${
               canSend
-                ? 'bg-[#00A884] hover:bg-[#008F72] cursor-pointer'
-                : 'bg-[#00A884]/40 opacity-40 cursor-not-allowed'
+                ? 'bg-[#20E39F] text-[#0A1A14] hover:bg-[#1CD392] cursor-pointer shadow-md'
+                : 'bg-[#20E39F]/20 text-[#20E39F]/40 cursor-not-allowed'
             }`}
             aria-label={editingMessage ? 'Save edited message' : 'Send message'}
             title={editingMessage ? 'Save changes' : 'Send'}
           >
             {isProcessingFile ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-[#0A1A14]" />
             ) : (
-              <Send className="w-4 h-4 ml-0.5" strokeWidth={1.75} />
+              <Send className="w-4 h-4 fill-current ml-0.5" />
             )}
           </button>
         </div>

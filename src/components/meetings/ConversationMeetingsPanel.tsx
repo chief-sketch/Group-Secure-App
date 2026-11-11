@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar,
   Plus,
@@ -54,6 +55,33 @@ export const ConversationMeetingsPanel: React.FC<ConversationMeetingsPanelProps>
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<MeetingDoc | null>(null);
 
+  // Detect prefers-reduced-motion
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    if (mql.addEventListener) mql.addEventListener('change', handler);
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', handler);
+    };
+  }, []);
+
+  // Escape to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const onMeetingCountChangeRef = useRef(onMeetingCountChange);
+  useEffect(() => {
+    onMeetingCountChangeRef.current = onMeetingCountChange;
+  });
+
   // Subscribe to conversation meetings ONLY while panel is open!
   useEffect(() => {
     if (!isOpen || !conversationId) {
@@ -69,8 +97,8 @@ export const ConversationMeetingsPanel: React.FC<ConversationMeetingsPanelProps>
       (list) => {
         setMeetings(list);
         setIsLoading(false);
-        if (onMeetingCountChange) {
-          onMeetingCountChange(list.length);
+        if (onMeetingCountChangeRef.current) {
+          onMeetingCountChangeRef.current(list.length);
         }
       },
       (err) => {
@@ -82,7 +110,7 @@ export const ConversationMeetingsPanel: React.FC<ConversationMeetingsPanelProps>
     return () => {
       unsub();
     };
-  }, [isOpen, conversationType, conversationId, onMeetingCountChange]);
+  }, [isOpen, conversationType, conversationId]);
 
   // Load cancelled meetings when group is expanded
   const handleToggleCancelled = async () => {
@@ -181,8 +209,6 @@ export const ConversationMeetingsPanel: React.FC<ConversationMeetingsPanelProps>
     }
   };
 
-  if (!isOpen) return null;
-
   const displayName =
     conversationType === 'channel'
       ? displayChannelName(conversationName)
@@ -202,12 +228,36 @@ export const ConversationMeetingsPanel: React.FC<ConversationMeetingsPanelProps>
         conversationName={displayName}
       />
 
-      {/* Side Panel Overlay / Container */}
-      <div
-        className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-[#111B21] border-l border-white/[0.08] shadow-2xl flex flex-col animate-slideInRight"
-        role="region"
-        aria-label="Meetings side panel"
-      >
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop Overlay for touch dismiss */}
+            <motion.div
+              key="meetings-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-30 bg-black/60 pointer-events-auto"
+              onClick={onClose}
+              aria-hidden="true"
+            />
+
+            {/* Side Panel Overlay / Container */}
+            <motion.div
+              key="meetings-panel"
+              role="region"
+              aria-label="Meetings side panel"
+              initial={prefersReducedMotion ? { opacity: 0 } : { x: '100%' }}
+              animate={prefersReducedMotion ? { opacity: 1 } : { x: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { x: '100%' }}
+              transition={
+                prefersReducedMotion
+                  ? { duration: 0.18 }
+                  : { type: 'spring', bounce: 0, duration: 0.35 }
+              }
+              className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] max-w-full bg-[#111C22] border-l border-[#2C3B44] shadow-2xl flex flex-col h-screen h-[100dvh] pb-safe pointer-events-auto"
+            >
         {/* Panel Header */}
         <div className="h-[60px] bg-[#1F2C33] px-4 flex items-center justify-between border-b border-white/[0.06] flex-shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -347,7 +397,10 @@ export const ConversationMeetingsPanel: React.FC<ConversationMeetingsPanelProps>
             )}
           </div>
         </div>
-      </div>
-    </>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  </>
   );
 };

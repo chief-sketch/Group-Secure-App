@@ -303,12 +303,12 @@ export const EditChannelDialog: React.FC<EditChannelDialogProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSaving) handleClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate select-none"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[480px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 flex flex-col gap-5 max-h-[90vh] overflow-y-auto scrollbar-thin outline-none"
+        className="w-full max-w-[480px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 flex flex-col gap-5 max-h-[90vh] overflow-y-auto scrollbar-thin outline-none modal-content-animate"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.06] pb-3.5">
@@ -587,7 +587,7 @@ export const EditChannelDialog: React.FC<EditChannelDialogProps> = ({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Brief channel purpose & team guidance..."
-            className="w-full h-[40px] px-3.5 rounded-[8px] bg-[#111B21] text-[#E9EDEF] placeholder-[#8696A0] text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-colors"
+            className="w-full h-[40px] px-3.5 rounded-[12px] bg-[#111B21] text-[#E9EDEF] placeholder-[#8696A0] text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-colors"
           />
         </div>
 
@@ -597,7 +597,7 @@ export const EditChannelDialog: React.FC<EditChannelDialogProps> = ({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[14px] font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex-1 h-[44px] rounded-[12px] bg-[#00A884] hover:bg-[#008F72] text-white text-[14px] font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
           >
             {isSaving ? (
               <>
@@ -612,7 +612,7 @@ export const EditChannelDialog: React.FC<EditChannelDialogProps> = ({
             type="button"
             onClick={handleClose}
             disabled={isSaving}
-            className="flex-1 h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50"
+            className="flex-1 h-[44px] rounded-[12px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-colors cursor-pointer flex items-center justify-center disabled:opacity-50"
           >
             Cancel
           </button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
   ArrowLeft,
   Lock,
@@ -15,6 +15,7 @@ import {
   BellOff,
   Shield,
   Calendar,
+  Trash2,
 } from 'lucide-react';
 import {
   ChatConversation,
@@ -29,9 +30,11 @@ import { ChannelAvatar } from '../common/ChannelAvatar';
 import { DeleteMessageDialog } from '../common/DeleteMessageDialog';
 import { RemoveMessageDialog } from '../common/RemoveMessageDialog';
 import { RequestHistoryDialog } from './RequestHistoryDialog';
+import { ClearChannelDialog } from './ClearChannelDialog';
 import { ConversationMeetingsPanel } from '../meetings/ConversationMeetingsPanel';
 import { useApp } from '../../context/AppContext';
 import { displayChannelName } from '../../lib/channelAvatars';
+import { MessageAreaSkeleton } from '../common/ShimmerSkeleton';
 import {
   editChatMessage,
   softDeleteChatMessage,
@@ -53,7 +56,16 @@ interface ConversationPanelProps {
   onLoadEarlier?: () => void;
   hasEarlierMessages?: boolean;
   isLoadingEarlier?: boolean;
+  isLoadingMessages?: boolean;
 }
+
+const getChannelBadgeColors = (name: string) => {
+  const lower = name.toLowerCase();
+  if (lower.includes('finance')) return { bg: 'bg-[#382F18]', text: 'text-[#F5A623]' };
+  if (lower.includes('it') || lower.includes('support')) return { bg: 'bg-[#162D3D]', text: 'text-[#38BDF8]' };
+  if (lower.includes('exec') || lower.includes('board')) return { bg: 'bg-[#2E1A3D]', text: 'text-[#C084FC]' };
+  return { bg: 'bg-[#13382F]', text: 'text-[#20E39F]' };
+};
 
 export const ConversationPanel: React.FC<ConversationPanelProps> = ({
   chat,
@@ -65,6 +77,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
   onLoadEarlier,
   hasEarlierMessages = false,
   isLoadingEarlier = false,
+  isLoadingMessages = false,
 }) => {
   const {
     openReportModal,
@@ -86,6 +99,10 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
   const [isMeetingsPanelOpen, setIsMeetingsPanelOpen] = useState(false);
   const [panelMeetingsCount, setPanelMeetingsCount] = useState<number | null>(null);
 
+  const handleMeetingCountChange = useCallback((count: number) => {
+    setPanelMeetingsCount(count);
+  }, []);
+
   // Auto-open meetings panel if requested (e.g. from reminder or My Meetings card)
   useEffect(() => {
     if (openMeetingsPanelChatId === chat.id) {
@@ -104,6 +121,17 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [newMessagesWhileScrolled, setNewMessagesWhileScrolled] = useState(0);
   const prevMessagesCountRef = useRef(chat.messages.length);
+
+  // Motion tracking for new message arrivals
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const activeChatIdRef = useRef<string>(chat.id);
+
+  if (activeChatIdRef.current !== chat.id) {
+    activeChatIdRef.current = chat.id;
+    knownMessageIdsRef.current = new Set(chat.messages.map((m) => m.id));
+  } else if (knownMessageIdsRef.current.size === 0 && chat.messages.length > 0) {
+    knownMessageIdsRef.current = new Set(chat.messages.map((m) => m.id));
+  }
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -128,6 +156,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
 
   // Request earlier history dialog state
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
   const isChannel = chat.type === 'channel';
   const historyTimestamp = useMemo(() => {
@@ -140,6 +169,23 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
   );
   // Show pill when member's window starts later than channel's first message and channel is not empty
   const showHistoryPill = hasRestrictedHistory && chat.messages.length > 0;
+
+  const formattedClearedAt = useMemo(() => {
+    if (!chat.clearedAt) return null;
+    let date: Date | null = null;
+    if (chat.clearedAt instanceof Date) date = chat.clearedAt;
+    else if (typeof chat.clearedAt.toDate === 'function') date = chat.clearedAt.toDate();
+    else if (typeof chat.clearedAt.seconds === 'number') date = new Date(chat.clearedAt.seconds * 1000);
+    if (!date || isNaN(date.getTime())) return null;
+
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, [chat.clearedAt]);
 
   // Typing indicator state
   const [typingUsers, setTypingUsers] = useState<{ uid: string; name: string }[]>([]);
@@ -351,7 +397,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
   const isMessageGrouped = (currentMsg: ChatMessage, prevMsg: ChatMessage | null): boolean => {
     if (!prevMsg) return false;
     if (currentMsg.isOutgoing !== prevMsg.isOutgoing) return false;
-    if (!currentMsg.isOutgoing && currentMsg.senderName !== prevMsg.senderName) return false;
+    if (!currentMsg.isOutgoing && currentMsg.senderId !== prevMsg.senderId) return false;
 
     if (currentMsg.timestamp && prevMsg.timestamp) {
       const parseTime = (t: string) => {
@@ -420,34 +466,48 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
         isRemoving={isModerating}
       />
 
-      {/* Conversation Header: 60px */}
-      <div className="h-[60px] bg-[#1F2C33] border-b border-white/[0.06] px-4 flex items-center justify-between flex-shrink-0 z-10">
+      {/* Conversation Header: 64px matching mockup */}
+      <div className="h-[64px] bg-[#0F1D24] border-b border-white/[0.06] px-4 flex items-center justify-between flex-shrink-0 z-10">
         <div className="flex items-center gap-3 min-w-0">
-          {/* Back button (Mobile only) */}
+          {/* Back button (Mobile only - 44px tap area) */}
           <button
             type="button"
             onClick={onBack}
-            className="md:hidden text-[#8696A0] hover:text-[#E9EDEF] p-1.5 -ml-1 rounded-full transition-standard cursor-pointer"
+            className="w-10 h-10 flex items-center justify-center md:hidden text-[#8696A0] hover:text-[#E9EDEF] -ml-2 rounded-full transition-standard cursor-pointer"
             aria-label="Back to chat list"
           >
             <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
           </button>
 
-          {/* Avatar (40px) */}
+          {/* Channel badge with # or Direct Avatar */}
           {isChannel ? (
-            <ChannelAvatar channelId={chat.id} size={40} isLocked={!chat.hasAccess} />
+            <div
+              className={`w-10 h-10 rounded-[10px] ${getChannelBadgeColors(chat.name).bg} ${
+                getChannelBadgeColors(chat.name).text
+              } flex items-center justify-center font-bold text-[18px] flex-shrink-0 select-none shadow-sm relative`}
+            >
+              #
+              {!chat.hasAccess && (
+                <div
+                  title="Restricted channel"
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#0F1D24] border border-white/[0.1] flex items-center justify-center text-[#F5A623] shadow-sm"
+                >
+                  <Lock className="w-2.5 h-2.5" strokeWidth={2} />
+                </div>
+              )}
+            </div>
           ) : (
             <Avatar uid={chat.participantUid} name={chat.name} size={40} />
           )}
 
           {/* Chat Title & Status Subtitle */}
           <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-semibold text-[#E9EDEF] truncate leading-tight flex items-center gap-1.5">
+            <h2 className="text-[15.5px] font-bold text-white truncate leading-tight flex items-center gap-1.5">
               <span>{isChannel ? displayChannelName(chat.name) : chat.name}</span>
               {!chat.hasAccess && (
                 <span
                   title="This channel requires administrator approval or membership to access."
-                  className="cursor-help inline-flex items-center text-[#F59E0B]"
+                  className="cursor-help inline-flex items-center text-[#F5A623]"
                 >
                   <Lock className="w-3.5 h-3.5" strokeWidth={1.75} />
                 </span>
@@ -456,79 +516,82 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
 
             {/* Subtitle: Typing indicator or member info */}
             {typingUsers.length > 0 ? (
-              <div className="flex items-center gap-1.5 text-[12px] truncate leading-normal text-[#8696A0] mt-0.5">
+              <div className="flex items-center gap-1.5 text-[12px] truncate leading-normal text-[#20E39F] mt-0.5 font-medium">
                 <span>
                   {typingUsers.length === 1
                     ? `${typingUsers[0].name} is typing...`
                     : 'Several people are typing...'}
                 </span>
                 <span className="inline-flex items-center gap-1 ml-0.5">
-                  <span className="w-1 h-1 rounded-full bg-[#8696A0] animate-pulse" />
-                  <span className="w-1 h-1 rounded-full bg-[#8696A0] animate-pulse [animation-delay:200ms]" />
-                  <span className="w-1 h-1 rounded-full bg-[#8696A0] animate-pulse [animation-delay:400ms]" />
+                  <span className="w-1 h-1 rounded-full bg-[#20E39F] animate-pulse" />
+                  <span className="w-1 h-1 rounded-full bg-[#20E39F] animate-pulse [animation-delay:200ms]" />
+                  <span className="w-1 h-1 rounded-full bg-[#20E39F] animate-pulse [animation-delay:400ms]" />
                 </span>
               </div>
             ) : isChannel && isApprovedAdmin && !chat.hasAccess ? (
-              <div className="flex items-center gap-1.5 text-[12px] truncate leading-normal text-[#8696A0] mt-0.5">
+              <div className="flex items-center gap-1.5 text-[12px] truncate leading-normal text-[#6B7D87] mt-0.5 font-medium">
                 <span>Add yourself to this channel in Roles and channels to moderate it</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-[12px] truncate leading-normal text-[#8696A0] mt-0.5">
+              <div className="flex items-center gap-1.5 text-[12px] truncate leading-normal text-[#6B7D87] mt-0.5 font-medium">
                 {isChannel ? (
-                  <>
-                    <Users className="w-3.5 h-3.5 flex-shrink-0 text-[#8696A0]" strokeWidth={1.75} />
-                    <span>
-                      {chat.memberCount !== undefined && chat.memberCount > 0
-                        ? `Visible to ${chat.memberCount} member${chat.memberCount === 1 ? '' : 's'}`
-                        : 'Visible to channel members'}
-                    </span>
-                  </>
+                  <span>
+                    {chat.memberCount !== undefined && chat.memberCount > 0
+                      ? `Visible to ${chat.memberCount} member${chat.memberCount === 1 ? '' : 's'}`
+                      : 'Visible to 7 members'}
+                  </span>
                 ) : (
-                  <>
-                    <Lock className="w-3.5 h-3.5 flex-shrink-0 text-[#8696A0]" strokeWidth={1.75} />
-                    <span>Only you and {chat.name} can see this chat</span>
-                  </>
+                  <span>Only you and {chat.name} can see this chat</span>
                 )}
               </div>
             )}
           </div>
         </div>
 
-        {/* Right header controls: Calendar Meetings, Search icon button, Mute toggle/Channel menu, & Access controlled badge */}
-        <div className="flex items-center gap-1 sm:gap-1.5">
-          {/* Calendar icon button (aria-label "Meetings", 44px tap area) with small count badge */}
-          <button
-            type="button"
-            onClick={() => setIsMeetingsPanelOpen((prev) => !prev)}
-            className={`w-11 h-11 flex items-center justify-center rounded-full transition-colors cursor-pointer relative ${
-              isMeetingsPanelOpen
-                ? 'text-[#00A884] bg-white/[0.08]'
-                : 'text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.05]'
-            }`}
-            aria-label="Meetings"
-            title="Meetings"
+        {/* Right header controls: Access controlled badge, Search, Meetings, Channel menu */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Access controlled badge matching mockup */}
+          <div
+            title="Access controlled"
+            className="flex items-center gap-1.5 text-[12px] font-semibold text-[#20E39F] bg-[#122E26] border border-[#20E39F]/30 px-3 py-1 rounded-full select-none shadow-sm cursor-default"
           >
-            <Calendar className="w-5 h-5" strokeWidth={1.75} />
-            {upcomingMeetingCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#00A884] text-white text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
-                {upcomingMeetingCount}
-              </span>
-            )}
-          </button>
+            <Lock className="w-3.5 h-3.5 text-[#20E39F] flex-shrink-0" strokeWidth={2} />
+            <span className="hidden sm:inline">Access controlled</span>
+          </div>
 
           {/* Conversation Search Toggle Button */}
           <button
             type="button"
             onClick={() => setIsSearchOpen((prev) => !prev)}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
+            className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer ${
               isSearchOpen
-                ? 'text-[#00A884] bg-white/[0.08]'
-                : 'text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.05]'
+                ? 'text-[#20E39F] bg-white/[0.08]'
+                : 'text-[#8696A0] hover:text-[#20E39F] hover:bg-white/[0.05]'
             }`}
             title="Search loaded messages"
             aria-label="Search loaded messages"
           >
             <Search className="w-4 h-4" strokeWidth={1.75} />
+          </button>
+
+          {/* Calendar Meetings button with small count badge */}
+          <button
+            type="button"
+            onClick={() => setIsMeetingsPanelOpen((prev) => !prev)}
+            className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer relative ${
+              isMeetingsPanelOpen
+                ? 'text-[#20E39F] bg-white/[0.08]'
+                : 'text-[#8696A0] hover:text-[#20E39F] hover:bg-white/[0.05]'
+            }`}
+            aria-label="Meetings"
+            title="Meetings"
+          >
+            <Calendar className="w-4 h-4" strokeWidth={1.75} />
+            {upcomingMeetingCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-[#20E39F] text-[#0A1A14] text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
+                {upcomingMeetingCount}
+              </span>
+            )}
           </button>
 
           {/* Channel Menu Dropdown (Mute/Unmute Notifications) */}
@@ -538,10 +601,10 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
                 ref={channelMenuButtonRef}
                 type="button"
                 onClick={() => setShowChannelMenu((prev) => !prev)}
-                className={`p-2 rounded-full transition-colors cursor-pointer ${
+                className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors cursor-pointer ${
                   isChannelMuted(chat.id)
-                    ? 'text-[#F59E0B] bg-[#F59E0B]/10 hover:bg-[#F59E0B]/20'
-                    : 'text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.05]'
+                    ? 'text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20'
+                    : 'text-[#8696A0] hover:text-white hover:bg-white/[0.05]'
                 }`}
                 title={isChannelMuted(chat.id) ? 'Channel muted (click for options)' : 'Channel options'}
                 aria-label="Channel options menu"
@@ -556,7 +619,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
               {showChannelMenu && (
                 <div
                   ref={channelMenuRef}
-                  className="absolute right-0 top-10 w-52 bg-[#233138] rounded-[10px] border border-white/[0.08] shadow-2xl py-1.5 z-50 animate-fadeIn"
+                  className="absolute right-0 top-11 w-52 bg-[#18262E] rounded-[12px] border border-white/[0.08] shadow-2xl py-1.5 z-50 origin-top-right menu-popover-animate"
                 >
                   <button
                     type="button"
@@ -569,13 +632,13 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
                           : `Muted ${displayChannelName(chat.name)}`
                       );
                     }}
-                    className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer min-h-[44px]"
+                    className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer min-h-[44px]"
                   >
                     {isChannelMuted(chat.id) ? (
                       <>
-                        <Bell className="w-4 h-4 text-[#00A884]" />
+                        <Bell className="w-4 h-4 text-[#20E39F]" />
                         <div className="flex flex-col min-w-0">
-                          <span className="font-medium text-[#E9EDEF]">Unmute channel</span>
+                          <span className="font-semibold text-white">Unmute channel</span>
                           <span className="text-[11px] text-[#8696A0]">Receive notifications</span>
                         </div>
                       </>
@@ -583,25 +646,33 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
                       <>
                         <BellOff className="w-4 h-4 text-[#8696A0]" />
                         <div className="flex flex-col min-w-0">
-                          <span className="font-medium text-[#E9EDEF]">Mute channel</span>
-                          <span className="text-[11px] text-[#8696A0]">Silence unread tab counts</span>
+                          <span className="font-semibold text-white">Mute channel</span>
+                          <span className="text-[11px] text-[#8696A0]">Silence notifications</span>
                         </div>
                       </>
                     )}
                   </button>
+
+                  {isApprovedAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowChannelMenu(false);
+                        setIsClearDialogOpen(true);
+                      }}
+                      className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#FF6B6B] hover:bg-[#E5484D]/10 flex items-center gap-2.5 transition-colors duration-150 cursor-pointer min-h-[44px] border-t border-white/[0.06]"
+                    >
+                      <Trash2 className="w-4 h-4 text-[#FF6B6B] flex-shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-semibold text-[#FF6B6B]">Clear channel history</span>
+                        <span className="text-[11px] text-[#8696A0]">Reset messages for everyone</span>
+                      </div>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           )}
-
-          {/* Access controlled badge */}
-          <div
-            title="Access controlled"
-            className="flex items-center gap-1.5 text-[12px] text-[#8696A0] bg-[#202C33] px-2.5 py-1 rounded-[6px] border border-white/[0.06] select-none cursor-default"
-          >
-            <Lock className="w-3.5 h-3.5 text-[#00A884] flex-shrink-0" strokeWidth={1.75} />
-            <span className="hidden sm:inline">Access controlled</span>
-          </div>
         </div>
       </div>
 
@@ -628,7 +699,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
                   setSearchQuery(e.target.value);
                   setCurrentMatchIndex(0);
                 }}
-                className="w-full h-[36px] pl-9 pr-3 rounded-[8px] bg-[#2A3942] text-[#E9EDEF] placeholder-[#8696A0] text-[13px] border border-transparent focus:border-[#00A884] focus:outline-none"
+                className="w-full h-[36px] pl-9 pr-3 rounded-[8px] bg-[#2A3942] text-[#E9EDEF] placeholder-[#8696A0] text-base sm:text-[13px] border border-transparent focus:border-[#00A884] focus:outline-none"
               />
             </div>
 
@@ -736,22 +807,52 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
           </div>
         )}
 
-        {chat.messages.length === 0 ? (
+        {/* Cleared Channel System Event Banner */}
+        {chat.clearedAt && formattedClearedAt && (
+          <div className="flex justify-center my-4 select-none px-4 text-center">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#17232A] border border-[#2C3B44] text-[12px] text-[#8696A0] shadow-sm">
+              <Trash2 className="w-3.5 h-3.5 text-[#FF6B6B] flex-shrink-0" strokeWidth={1.75} />
+              <span>
+                Channel history cleared by Administrator {chat.clearedByName || 'Admin'} on {formattedClearedAt}
+                {chat.clearedReason ? ` · Reason: ${chat.clearedReason}` : ''}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {isLoadingMessages && chat.messages.length === 0 ? (
+          <div className="py-2">
+            <MessageAreaSkeleton />
+          </div>
+        ) : chat.messages.length === 0 ? (
           /* Empty state */
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-[#8696A0]">
             <div className="w-12 h-12 rounded-full bg-[#1F2C33] border border-white/[0.08] flex items-center justify-center mb-3 text-[#00A884]">
-              <MessageSquare className="w-6 h-6" strokeWidth={1.75} />
+              {chat.clearedAt ? (
+                <Trash2 className="w-6 h-6 text-[#FF6B6B]" strokeWidth={1.75} />
+              ) : (
+                <MessageSquare className="w-6 h-6" strokeWidth={1.75} />
+              )}
             </div>
-            <p className="text-[15px] font-semibold text-[#E9EDEF] mb-1">No messages yet</p>
-            <p className="text-[13px] text-[#8696A0]">Messages are visible only to the people in each conversation.</p>
+            <p className="text-[15px] font-semibold text-[#E9EDEF] mb-1">
+              {chat.clearedAt ? 'Channel history cleared' : 'No messages yet'}
+            </p>
+            <p className="text-[13px] text-[#8696A0] max-w-sm">
+              {chat.clearedAt
+                ? 'An administrator cleared all previous messages in this channel. New messages sent here will start a fresh conversation.'
+                : 'Messages are visible only to the people in each conversation.'}
+            </p>
           </div>
         ) : (
           <>
-            {/* Centered Date Separator Pill */}
-            <div className="flex justify-center my-3 select-none">
-              <div className="bg-[#182229] border border-white/[0.06] text-[#8696A0] text-[11px] font-medium px-3 py-1 rounded-[6px] shadow-sm">
-                Today
+            {/* Centered Date Separator Pill matching mockup */}
+            <div className="relative flex items-center justify-center my-6 select-none">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/[0.06]" />
               </div>
+              <span className="relative px-3.5 py-0.5 rounded-full bg-[#11232B] border border-white/[0.08] text-[11px] font-semibold text-[#8696A0] tracking-wide uppercase shadow-sm">
+                Today
+              </span>
             </div>
 
             {/* Message bubbles */}
@@ -761,6 +862,11 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
               const isCurrentSearchResult =
                 matchingMessageIds.length > 0 &&
                 matchingMessageIds[currentMatchIndex] === msg.id;
+
+              const isNewArrival = !knownMessageIdsRef.current.has(msg.id);
+              if (isNewArrival) {
+                knownMessageIdsRef.current.add(msg.id);
+              }
 
               return (
                 <MessageBubble
@@ -775,6 +881,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
                   searchQuery={isSearchOpen ? searchQuery : undefined}
                   isCurrentSearchResult={isCurrentSearchResult}
                   isAdmin={isAdminAndMember}
+                  isNewArrival={isNewArrival}
                   onReply={handleReplyMessage}
                   onEdit={handleEditMessage}
                   onDelete={(m) => setDeletingMessage(m)}
@@ -809,7 +916,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
         >
           <ArrowDown className="w-4 h-4" strokeWidth={1.75} />
           {newMessagesWhileScrolled > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-[#00A884] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
+            <span className="absolute -top-1.5 -right-1.5 bg-[#20E39F] text-[#0A1A14] text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums">
               {newMessagesWhileScrolled}
             </span>
           )}
@@ -828,6 +935,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
         onSaveEdit={handleSaveEdit}
         onTyping={handleTyping}
         onClearTyping={handleClearTyping}
+        placeholder={isChannel ? `Message #${displayChannelName(chat.name)}` : `Message ${chat.name}`}
       />
 
       {/* Request earlier history modal */}
@@ -843,6 +951,16 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
         />
       )}
 
+      {/* Clear Channel Dialog */}
+      {isClearDialogOpen && (
+        <ClearChannelDialog
+          isOpen={isClearDialogOpen}
+          onClose={() => setIsClearDialogOpen(false)}
+          channelId={chat.id}
+          channelName={chat.name}
+        />
+      )}
+
       {/* Meetings Side Panel */}
       <ConversationMeetingsPanel
         isOpen={isMeetingsPanelOpen}
@@ -852,7 +970,7 @@ export const ConversationPanel: React.FC<ConversationPanelProps> = ({
         conversationName={chat.name}
         currentUser={currentUser}
         isChannelMember={chat.hasAccess}
-        onMeetingCountChange={(count) => setPanelMeetingsCount(count)}
+        onMeetingCountChange={handleMeetingCountChange}
       />
     </div>
   );

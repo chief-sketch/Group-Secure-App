@@ -26,6 +26,7 @@ import {
 } from '../../lib/channelAvatars';
 import { Timestamp } from '../../lib/firebaseService';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { DeleteUserDialog } from './DeleteUserDialog';
 
 export const RolesPanel: React.FC = () => {
   const {
@@ -35,6 +36,7 @@ export const RolesPanel: React.FC = () => {
     suspendUser,
     reactivateUser,
     reconsiderUser,
+    deleteUserAccount,
     showToast,
     getDirectoryUser,
     adminRemoveUserPhoto,
@@ -56,10 +58,26 @@ export const RolesPanel: React.FC = () => {
   // Sync selected user with live users list from Firestore
   useEffect(() => {
     if (selectedUser) {
-      const live = users.find((u) => u.id === selectedUser.id);
-      if (live && live !== selectedUser) {
-        setSelectedUser(live);
+      const live = activeAndSuspendedUsers.find((u) => u.id === selectedUser.id);
+      if (live) {
+        if (live !== selectedUser) {
+          setSelectedUser(live);
+        }
+      } else {
+        // Stale or deleted user; fall back to the first available or null
+        const fallback = activeAndSuspendedUsers[0] || null;
+        setSelectedUser(fallback);
+        if (fallback) {
+          setEditRole(fallback.role);
+          setEditChannels([...fallback.channels]);
+        }
       }
+    } else if (activeAndSuspendedUsers.length > 0) {
+      // Auto-select first user once loaded
+      const first = activeAndSuspendedUsers[0];
+      setSelectedUser(first);
+      setEditRole(first.role);
+      setEditChannels([...first.channels]);
     }
   }, [users]);
 
@@ -70,6 +88,10 @@ export const RolesPanel: React.FC = () => {
   // Reconsider Modal State
   const [isReconsiderModalOpen, setIsReconsiderModalOpen] = useState(false);
   const [isSubmittingReconsider, setIsSubmittingReconsider] = useState(false);
+
+  // Delete User Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSubmittingDelete, setIsSubmittingDelete] = useState(false);
 
   // Bulk Add to Channel State
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -332,6 +354,22 @@ export const RolesPanel: React.FC = () => {
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!selectedUser) return;
+    setIsSubmittingDelete(true);
+    try {
+      const userToDelete = selectedUser;
+      await deleteUserAccount(userToDelete.id);
+      setIsDeleteModalOpen(false);
+      const remaining = activeAndSuspendedUsers.filter((u) => u.id !== userToDelete.id);
+      setSelectedUser(remaining[0] || null);
+    } catch (err) {
+      console.error('Error deleting user account:', err);
+    } finally {
+      setIsSubmittingDelete(false);
+    }
+  };
+
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
       case 'admin':
@@ -387,7 +425,7 @@ export const RolesPanel: React.FC = () => {
                 aria-label="Search approved users"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-[40px] pl-9 pr-3 rounded-[8px] bg-[#202C33] text-[#E9EDEF] placeholder-[#8696A0] text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard"
+                className="w-full h-[40px] pl-9 pr-3 rounded-[8px] bg-[#202C33] text-[#E9EDEF] placeholder-[#8696A0] text-base sm:text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard"
               />
             </div>
 
@@ -605,6 +643,30 @@ export const RolesPanel: React.FC = () => {
                         <span>Remove photo</span>
                       </button>
                     ) : null}
+
+                    {/* Delete Account Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsDeleteModalOpen(true)}
+                      disabled={
+                        selectedUser.id === currentSession?.uid ||
+                        selectedUser.email.toLowerCase() === 'dmbogo20@gmail.com' ||
+                        (selectedUser.role === 'admin' && approvedAdminsCount <= 1)
+                      }
+                      title={
+                        selectedUser.id === currentSession?.uid
+                          ? 'You cannot delete your own account'
+                          : selectedUser.email.toLowerCase() === 'dmbogo20@gmail.com'
+                          ? 'Root administrator account cannot be deleted'
+                          : selectedUser.role === 'admin' && approvedAdminsCount <= 1
+                          ? 'Cannot delete the last remaining administrator'
+                          : 'Permanently delete user account'
+                      }
+                      className="h-[30px] px-2.5 rounded-[8px] bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete account</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1253,6 +1315,15 @@ export const RolesPanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* PERMANENTLY DELETE USER CONFIRMATION MODAL */}
+      <DeleteUserDialog
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        user={selectedUser}
+        isDeleting={isSubmittingDelete}
+      />
     </div>
   );
 };

@@ -89,12 +89,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm transition-standard"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[440px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] shadow-2xl p-6 text-left select-none animate-fadeIn outline-none"
+        className="w-full max-w-[440px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left select-none outline-none modal-content-animate"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06] mb-4">
@@ -185,14 +185,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="h-[38px] px-4 rounded-[8px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
+              className="h-[40px] px-4 rounded-[12px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || (!isMessageReport && !note.trim())}
-              className="h-[38px] px-4 rounded-[8px] bg-[#E5484D] hover:bg-[#c93b40] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[13px] font-semibold transition-standard cursor-pointer flex items-center gap-2"
+              className="h-[40px] px-4 rounded-[12px] bg-[#E5484D] hover:bg-[#c93b40] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[13px] font-semibold transition-standard cursor-pointer flex items-center gap-2 shadow-sm"
             >
               {isSubmitting ? 'Sending...' : 'Send report'}
             </button>

@@ -51,12 +51,12 @@ export const PrivacyNoticeModal: React.FC<PrivacyNoticeModalProps> = ({
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm transition-standard"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate"
       >
         <div
           ref={dialogRef}
           tabIndex={-1}
-          className="w-full max-w-[460px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] shadow-2xl p-6 text-left select-none animate-fadeIn outline-none"
+          className="w-full max-w-[460px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left select-none outline-none modal-content-animate"
         >
           <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06] mb-4">
             <div className="flex items-center gap-2.5">
@@ -108,7 +108,7 @@ export const PrivacyNoticeModal: React.FC<PrivacyNoticeModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="h-[40px] px-5 rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium transition-standard cursor-pointer"
+              className="h-[40px] px-5 rounded-[12px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium transition-standard cursor-pointer shadow-sm"
             >
               Close
             </button>

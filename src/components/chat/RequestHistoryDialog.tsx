@@ -79,12 +79,12 @@ export const RequestHistoryDialog: React.FC<RequestHistoryDialogProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 transition-standard animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[420px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] shadow-2xl p-6 select-none relative outline-none"
+        className="w-full max-w-[420px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 select-none relative outline-none modal-content-animate"
       >
         <button
           type="button"
@@ -142,7 +142,7 @@ export const RequestHistoryDialog: React.FC<RequestHistoryDialogProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full h-[40px] rounded-[8px] bg-white/[0.08] hover:bg-white/[0.12] text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
+                className="w-full min-h-[44px] h-[44px] rounded-[8px] bg-white/[0.08] hover:bg-white/[0.12] text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
               >
                 Close
               </button>
@@ -165,7 +165,7 @@ export const RequestHistoryDialog: React.FC<RequestHistoryDialogProps> = ({
                 onChange={(e) => setNote(e.target.value.slice(0, 200))}
                 rows={3}
                 placeholder="Reason or context for needing past messages..."
-                className="w-full bg-[#111B21] border border-white/[0.08] rounded-[8px] p-3 text-[13px] text-[#E9EDEF] placeholder-[#8696A0]/75 focus:outline-none focus:border-[#00A884] transition-colors resize-none"
+                className="w-full bg-[#111B21] border border-white/[0.08] rounded-[12px] p-3 text-base sm:text-[13px] text-[#E9EDEF] placeholder-[#8696A0]/75 focus:outline-none focus:border-[#00A884] transition-colors resize-none"
               />
             </div>
 
@@ -173,14 +173,14 @@ export const RequestHistoryDialog: React.FC<RequestHistoryDialogProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-[40px] px-4 rounded-[8px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#8696A0] hover:text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
+                className="min-h-[44px] h-[44px] px-4 rounded-[12px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#8696A0] hover:text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="h-[40px] px-5 rounded-[8px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium flex items-center gap-2 transition-standard cursor-pointer disabled:opacity-50"
+                className="min-h-[44px] h-[44px] px-5 rounded-[12px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium flex items-center gap-2 transition-standard cursor-pointer disabled:opacity-50 shadow-sm"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

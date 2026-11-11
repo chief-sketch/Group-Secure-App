@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserCheck, CheckCircle2, Check, X, ShieldAlert } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { UserCheck, CheckCircle2, Check, X, ShieldAlert, Loader2 } from 'lucide-react';
 import { useApp, ALL_CHANNELS } from '../../context/AppContext';
 import { OrgUser, UserRole } from '../../types';
 import { Avatar } from '../common/Avatar';
 import { ChannelAvatar } from '../common/ChannelAvatar';
 import { displayChannelName } from '../../lib/channelAvatars';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { HoldToConfirmButton } from '../common/HoldToConfirmButton';
 
 export const PendingApprovals: React.FC = () => {
-  const { users, approveUser, rejectUser } = useApp();
+  const { users, approveUser, rejectUser, showToast } = useApp();
 
   const pendingUsers = users.filter((u) => u.status === 'pending');
 
@@ -68,20 +70,46 @@ export const PendingApprovals: React.FC = () => {
     }
   };
 
-  const handleConfirmApproval = () => {
-    if (!approvingUser) return;
-    approveUser(approvingUser.id, selectedRole, selectedChannels, channelHistoryOptions);
-    setApprovingUser(null);
+  const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+  const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
+  const [quickApprovingId, setQuickApprovingId] = useState<string | null>(null);
+
+  const handleConfirmApproval = async () => {
+    if (!approvingUser || isSubmittingApproval) return;
+    setIsSubmittingApproval(true);
+    try {
+      await approveUser(approvingUser.id, selectedRole, selectedChannels, channelHistoryOptions);
+      setApprovingUser(null);
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to approve user');
+    } finally {
+      setIsSubmittingApproval(false);
+    }
   };
 
-  const handleQuickApproveToGeneral = (user: OrgUser) => {
-    approveUser(user.id, 'staff', ['General'], { General: 'now' });
+  const handleQuickApproveToGeneral = async (user: OrgUser) => {
+    if (quickApprovingId) return;
+    setQuickApprovingId(user.id);
+    try {
+      await approveUser(user.id, 'staff', ['General'], { General: 'now' });
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to approve user');
+    } finally {
+      setQuickApprovingId(null);
+    }
   };
 
-  const handleConfirmRejection = () => {
-    if (!rejectingUser) return;
-    rejectUser(rejectingUser.id);
-    setRejectingUser(null);
+  const handleConfirmRejection = async () => {
+    if (!rejectingUser || isSubmittingRejection) return;
+    setIsSubmittingRejection(true);
+    try {
+      await rejectUser(rejectingUser.id);
+      setRejectingUser(null);
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to reject user');
+    } finally {
+      setIsSubmittingRejection(false);
+    }
   };
 
   return (
@@ -132,115 +160,143 @@ export const PendingApprovals: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
-                {pendingUsers.map((user) => (
-                  <tr key={user.id} className="h-[52px] hover:bg-white/[0.03] transition-standard">
-                    <td className="py-2.5 px-5">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar uid={user.id} name={user.fullName} size={24} />
-                        <div className="min-w-0">
-                          <div className="font-medium text-[#E9EDEF]">{user.fullName}</div>
-                          <div className="text-[12px] text-[#8696A0] font-mono">{user.email}</div>
+                <AnimatePresence mode="popLayout">
+                  {pendingUsers.map((user) => (
+                    <motion.tr
+                      key={user.id}
+                      layout
+                      initial={{ opacity: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                      className="h-[52px] hover:bg-white/[0.03] transition-colors"
+                    >
+                      <td className="py-2.5 px-5">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar uid={user.id} name={user.fullName} size={24} />
+                          <div className="min-w-0">
+                            <div className="font-medium text-[#E9EDEF]">{user.fullName}</div>
+                            <div className="text-[12px] text-[#8696A0] font-mono">{user.email}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-5 text-[#E9EDEF]">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[12px] bg-white/[0.05] text-[#E9EDEF]">
-                        {user.department}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-5">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30">
-                        Pending
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-5 text-[#8696A0] tabular-nums text-[13px]">
-                      {user.dateRegistered}
-                    </td>
-                    <td className="py-2.5 px-5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleQuickApproveToGeneral(user)}
-                          title="Quick approve and add to General (sees messages from now)"
-                          className="min-h-[44px] h-[44px] px-3 rounded-[8px] bg-transparent hover:bg-white/[0.05] border border-[#00A884]/40 text-[#00A884] text-[12px] font-medium flex items-center gap-1 transition-standard cursor-pointer whitespace-nowrap"
-                        >
-                          <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                          <span>Add to General</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openApproveModal(user)}
-                          className="h-[36px] px-3.5 rounded-[8px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer"
-                        >
-                          <Check className="w-3.5 h-3.5" strokeWidth={2} />
-                          <span>Approve</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectingUser(user)}
-                          className="h-[36px] px-3 rounded-[8px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] hover:border-[#E5484D]/50 hover:text-[#E5484D] text-[#8696A0] text-[13px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" strokeWidth={1.75} />
-                          <span>Reject</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-2.5 px-5 text-[#E9EDEF]">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[12px] bg-white/[0.05] text-[#E9EDEF]">
+                          {user.department}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30">
+                          Pending
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-5 text-[#8696A0] tabular-nums text-[13px]">
+                        {user.dateRegistered}
+                      </td>
+                      <td className="py-2.5 px-5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            disabled={quickApprovingId === user.id}
+                            onClick={() => handleQuickApproveToGeneral(user)}
+                            title="Quick approve and add to General (sees messages from now)"
+                            className="min-h-[44px] h-[44px] px-3 rounded-[8px] bg-transparent hover:bg-white/[0.05] border border-[#00A884]/40 text-[#00A884] text-[12px] font-medium flex items-center gap-1 transition-standard cursor-pointer whitespace-nowrap disabled:opacity-50"
+                          >
+                            {quickApprovingId === user.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                            )}
+                            <span>Add to General</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openApproveModal(user)}
+                            className="h-[36px] px-3.5 rounded-[8px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                            <span>Approve</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRejectingUser(user)}
+                            className="h-[36px] px-3 rounded-[8px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] hover:border-[#E5484D]/50 hover:text-[#E5484D] text-[#8696A0] text-[13px] font-medium flex items-center gap-1.5 transition-standard cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" strokeWidth={1.75} />
+                            <span>Reject</span>
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </tbody>
             </table>
           </div>
 
           {/* Mobile Stacked Card View */}
           <div className="md:hidden divide-y divide-white/[0.06]">
-            {pendingUsers.map((user) => (
-              <div key={user.id} className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Avatar uid={user.id} name={user.fullName} size={32} />
-                    <div className="min-w-0">
-                      <div className="font-medium text-[#E9EDEF] truncate">{user.fullName}</div>
-                      <div className="text-[12px] text-[#8696A0] font-mono truncate">{user.email}</div>
+            <AnimatePresence mode="popLayout">
+              {pendingUsers.map((user) => (
+                <motion.div
+                  key={user.id}
+                  layout
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  className="p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar uid={user.id} name={user.fullName} size={32} />
+                      <div className="min-w-0">
+                        <div className="font-medium text-[#E9EDEF] truncate">{user.fullName}</div>
+                        <div className="text-[12px] text-[#8696A0] font-mono truncate">{user.email}</div>
+                      </div>
                     </div>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex-shrink-0">
+                      Pending
+                    </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex-shrink-0">
-                    Pending
-                  </span>
-                </div>
 
-                <div className="flex items-center justify-between text-[12px] text-[#8696A0]">
-                  <span>Dept: <strong className="text-[#E9EDEF] font-normal">{user.department}</strong></span>
-                  <span className="tabular-nums">{user.dateRegistered}</span>
-                </div>
+                  <div className="flex items-center justify-between text-[12px] text-[#8696A0]">
+                    <span>Dept: <strong className="text-[#E9EDEF] font-normal">{user.department}</strong></span>
+                    <span className="tabular-nums">{user.dateRegistered}</span>
+                  </div>
 
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickApproveToGeneral(user)}
-                    className="flex-1 min-h-[44px] h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-[#00A884]/40 text-[#00A884] text-[12px] font-medium flex items-center justify-center gap-1.5 transition-standard cursor-pointer"
-                  >
-                    <Check className="w-4 h-4 stroke-[2.5]" />
-                    <span>Add to General</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openApproveModal(user)}
-                    className="flex-1 h-[40px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium flex items-center justify-center gap-1.5 transition-standard cursor-pointer"
-                  >
-                    <Check className="w-4 h-4" strokeWidth={2} />
-                    <span>Approve</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRejectingUser(user)}
-                    className="h-[40px] px-3 rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E5484D] text-[13px] font-medium flex items-center justify-center gap-1.5 transition-standard cursor-pointer"
-                  >
-                    <X className="w-4 h-4" strokeWidth={1.75} />
-                    <span>Reject</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={quickApprovingId === user.id}
+                      onClick={() => handleQuickApproveToGeneral(user)}
+                      className="flex-1 min-h-[44px] h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-[#00A884]/40 text-[#00A884] text-[12px] font-medium flex items-center justify-center gap-1.5 transition-standard cursor-pointer disabled:opacity-50"
+                    >
+                      {quickApprovingId === user.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      )}
+                      <span>Add to General</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openApproveModal(user)}
+                      className="flex-1 min-h-[44px] h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-medium flex items-center justify-center gap-1.5 transition-standard cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" strokeWidth={2} />
+                      <span>Approve</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejectingUser(user)}
+                      className="min-h-[44px] h-[44px] px-3.5 rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E5484D] text-[13px] font-medium flex items-center justify-center gap-1.5 transition-standard cursor-pointer"
+                    >
+                      <X className="w-4 h-4" strokeWidth={1.75} />
+                      <span>Reject</span>
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -393,15 +449,18 @@ export const PendingApprovals: React.FC = () => {
             <div className="flex gap-2.5 pt-3 border-t border-white/[0.06]">
               <button
                 type="button"
+                disabled={isSubmittingApproval}
                 onClick={handleConfirmApproval}
-                className="flex-1 h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center"
+                className="flex-1 h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                Confirm Approval
+                {isSubmittingApproval && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>Confirm Approval</span>
               </button>
               <button
                 type="button"
+                disabled={isSubmittingApproval}
                 onClick={() => setApprovingUser(null)}
-                className="flex-1 h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center"
+                className="flex-1 h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -416,7 +475,7 @@ export const PendingApprovals: React.FC = () => {
           role="dialog"
           aria-modal="true"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setRejectingUser(null);
+            if (e.target === e.currentTarget && !isSubmittingRejection) setRejectingUser(null);
           }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 transition-standard"
         >
@@ -438,17 +497,20 @@ export const PendingApprovals: React.FC = () => {
             </p>
 
             <div className="flex flex-col gap-2.5">
+              <HoldToConfirmButton
+                label="Reject registration"
+                holdingLabel="Holding to reject..."
+                confirmedLabel="Rejecting..."
+                onConfirm={handleConfirmRejection}
+                disabled={isSubmittingRejection}
+                variant="danger"
+                className="w-full"
+              />
               <button
                 type="button"
-                onClick={handleConfirmRejection}
-                className="w-full h-[44px] rounded-[10px] bg-[#E5484D] hover:bg-[#c93b40] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center"
-              >
-                Reject Registration
-              </button>
-              <button
-                type="button"
+                disabled={isSubmittingRejection}
                 onClick={() => setRejectingUser(null)}
-                className="w-full h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center"
+                className="w-full h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center disabled:opacity-50"
               >
                 Cancel
               </button>

@@ -2,7 +2,6 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   sendPasswordResetEmail,
   updateProfile,
   reauthenticateWithCredential,
@@ -126,6 +125,14 @@ export function parseFriendlyError(err: any): string {
     err?.code === 'resource-exhausted'
   ) {
     return 'The service is busy right now. Please try again later.';
+  }
+
+  if (msg.includes('QuotaExceededError') || msg.includes('exceeded the quota')) {
+    return 'Browser storage limit exceeded. Please refresh the page and try again.';
+  }
+
+  if (msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('FIRESTORE (')) {
+    return 'A database connection error occurred. Please refresh and try again.';
   }
 
   try {
@@ -254,14 +261,6 @@ export async function signUpWithStaffEmail(
   // Create users/{uid} document strictly AFTER user is signed in
   const profile = await createStaffProfile(cred.user, fullName, department, 'password');
 
-  // Send verification email
-  try {
-    await sendEmailVerification(cred.user);
-  } catch (err: any) {
-    console.warn('sendEmailVerification error:', err?.code, err);
-    throw new Error('Could not send the verification email. Try again.');
-  }
-
   return { user: cred.user, profile };
 }
 
@@ -369,9 +368,9 @@ export async function getUserProfile(uid: string): Promise<UserProfileResult> {
     }
   } catch {}
 
-  // 2. Fetch from network with a short 2500ms timeout
+  // 2. Fetch from network with a robust 8000ms timeout
   try {
-    const snap = await withTimeout(getDoc(doc(db, 'users', uid)), 2500, 'deadline-exceeded');
+    const snap = await withTimeout(getDoc(doc(db, 'users', uid)), 8000, 'deadline-exceeded');
     if (snap.exists()) {
       return { profile: snap.data() as OrgUser, fromCache: false };
     }
@@ -380,26 +379,21 @@ export async function getUserProfile(uid: string): Promise<UserProfileResult> {
     const code = err?.code || (err instanceof Error ? err.message : String(err));
     const isResourceExhausted =
       code === 'resource-exhausted' || String(err).includes('resource-exhausted');
-    const isTransient =
-      isResourceExhausted ||
-      code === 'unavailable' ||
-      code === 'deadline-exceeded' ||
-      code === 'network-request-failed';
 
-    if (isTransient) {
-      // 1. Fall back ONLY to Firestore's own offline IndexedDB persistence cache
+    if (isResourceExhausted) {
+      // Fall back to cache if available
       try {
         const cachedSnap = await getDocFromCache(doc(db, 'users', uid));
         if (cachedSnap.exists()) {
           return {
             profile: cachedSnap.data() as OrgUser,
             fromCache: true,
-            isBusy: isResourceExhausted,
+            isBusy: true,
           };
         }
       } catch {}
 
-      console.warn(`[Firestore getUserProfile notice] Remote service busy or unreachable (${code})`);
+      console.warn(`[Firestore getUserProfile notice] Remote quota exhausted (${code})`);
       return { profile: null, fromCache: false, isBusy: true };
     }
 
@@ -409,7 +403,7 @@ export async function getUserProfile(uid: string): Promise<UserProfileResult> {
     }
 
     console.warn(`[Firestore getUserProfile notice] Error fetching profile (${code})`);
-    return { profile: null, fromCache: false };
+    return { profile: null, fromCache: false, isBusy: false };
   }
 }
 
@@ -496,9 +490,9 @@ export async function bootstrapAdminProfileIfNeeded(
     }
   } catch {}
 
-  // 2. Fetch or create via network with 2500ms timeout
+  // 2. Fetch or create via network with robust 8000ms timeout
   try {
-    const snap = await withTimeout(getDoc(doc(db, 'users', user.uid)), 2500, 'deadline-exceeded');
+    const snap = await withTimeout(getDoc(doc(db, 'users', user.uid)), 8000, 'deadline-exceeded');
     if (snap.exists()) {
       return { profile: snap.data() as OrgUser };
     }
@@ -508,7 +502,7 @@ export async function bootstrapAdminProfileIfNeeded(
         ...adminProfile,
         createdAt: serverTimestamp(),
       }),
-      3000,
+      8000,
       'deadline-exceeded'
     );
 
@@ -517,13 +511,8 @@ export async function bootstrapAdminProfileIfNeeded(
     const code = err?.code || (err instanceof Error ? err.message : String(err));
     const isResourceExhausted =
       code === 'resource-exhausted' || String(err).includes('resource-exhausted');
-    const isTransient =
-      isResourceExhausted ||
-      code === 'unavailable' ||
-      code === 'deadline-exceeded' ||
-      code === 'network-request-failed';
 
-    if (isTransient) {
+    if (isResourceExhausted) {
       try {
         const cachedSnap = await getDocFromCache(doc(db, 'users', user.uid));
         if (cachedSnap.exists()) {
@@ -531,11 +520,20 @@ export async function bootstrapAdminProfileIfNeeded(
         }
       } catch {}
 
-      console.warn(`[Firestore bootstrap notice] Server busy or unreachable (${code})`);
+      console.warn(`[Firestore bootstrap notice] Server quota exhausted (${code})`);
       return { profile: null, isBusy: true };
     }
 
-    handleFirestoreError(err, OperationType.WRITE, path);
+    // Try cache if network failed
+    try {
+      const cachedSnap = await getDocFromCache(doc(db, 'users', user.uid));
+      if (cachedSnap.exists()) {
+        return { profile: cachedSnap.data() as OrgUser };
+      }
+    } catch {}
+
+    console.warn(`[Firestore bootstrap notice] Error or timeout during bootstrap (${code})`);
+    return { profile: null, isBusy: false };
   }
 }
 
@@ -743,6 +741,45 @@ export async function logAuditToFirestore(entry: AuditLogEntry): Promise<void> {
 }
 
 /**
+ * Delete all existing audit log documents from Firestore in batches,
+ * and record a single fresh audit log document documenting the purge.
+ */
+export async function deleteAuditLogsInFirestore(
+  adminUid: string,
+  adminName: string
+): Promise<void> {
+  const colRef = collection(db, 'auditLogs');
+  const snap = await getDocs(colRef);
+  
+  if (!snap.empty) {
+    // Delete in chunks of up to 450 (under the 500 batch limit)
+    const docs = snap.docs;
+    const chunkSize = 400;
+    for (let i = 0; i < docs.length; i += chunkSize) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + chunkSize);
+      chunk.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+
+  // Create an audit record documenting the clearance
+  const now = new Date();
+  const timeStr = `Today at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  const clearanceEntry: AuditLogEntry = {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: timeStr,
+    actor: adminName,
+    actorUid: adminUid,
+    action: 'Governance activity cleared',
+    details: `Governance activity logs purged by administrator ${adminName}`,
+    category: 'Purge',
+    type: 'audit_cleared',
+  };
+  await logAuditToFirestore(clearanceEntry);
+}
+
+/**
  * Sign out of both Firebase Auth and in-app email session
  */
 export async function logoutFirebase(): Promise<void> {
@@ -822,6 +859,10 @@ export function subscribeToChannels(
           avatarIcon: data.avatarIcon,
           avatarColor: data.avatarColor,
           avatarPhoto: data.avatarPhoto || '',
+          clearedAt: data.clearedAt,
+          clearedBy: data.clearedBy,
+          clearedByName: data.clearedByName,
+          clearedReason: data.clearedReason,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         });
@@ -863,6 +904,47 @@ export async function updateChannelInFirestore(
     },
     { merge: true }
   );
+}
+
+/**
+ * Admin action: Clear channel history for all users by updating clearedAt watermark
+ * on the channel doc and recording an entry in the audit log.
+ */
+export async function clearChannelHistory(
+  channelId: string,
+  adminUid: string,
+  adminName: string,
+  reason: string
+): Promise<void> {
+  const normId = normalizeChannelId(channelId);
+  const channelRef = doc(db, 'channels', normId);
+  const now = new Date();
+  const timeStr = `Today at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+  await setDoc(
+    channelRef,
+    {
+      clearedAt: serverTimestamp(),
+      clearedBy: adminUid,
+      clearedByName: adminName,
+      clearedReason: reason || 'Routine channel cleanup',
+      lastMessage: 'Channel cleared by administrator',
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  const auditId = `log-clear-${normId}-${Date.now()}`;
+  await logAuditToFirestore({
+    id: auditId,
+    timestamp: timeStr,
+    actor: adminName,
+    actorUid: adminUid,
+    action: `Channel cleared: #${normId}`,
+    details: `Admin cleared message history for #${normId}. Reason: ${reason || 'Routine channel cleanup'}`,
+    category: 'Purge',
+    type: 'channel_clear',
+  });
 }
 
 /**
@@ -1069,16 +1151,33 @@ export function subscribeToConversationMessages(
   callback: (messages: ChatMessage[]) => void,
   onError?: (err: any) => void,
   autoMarkRead: boolean = true,
-  historyFromTimestamp?: Timestamp
+  historyFromTimestamp?: Timestamp,
+  clearedAtTimestamp?: Timestamp
 ): Unsubscribe {
   const basePath = conversationType === 'channel' ? 'channels' : 'directChats';
 
-  // Apply historyFrom lower bound for channels
-  // For channels, every query must include where createdAt >= lowerBound (default Timestamp.fromMillis(0))
-  const lowerBound =
-    conversationType === 'channel'
-      ? historyFromTimestamp || Timestamp.fromMillis(0)
-      : null;
+  // Apply historyFrom and clearedAt lower bound for channels
+  let lowerBound: Timestamp | null = null;
+  if (conversationType === 'channel') {
+    let histMillis = 0;
+    if (historyFromTimestamp) {
+      if (typeof historyFromTimestamp.toMillis === 'function') {
+        histMillis = historyFromTimestamp.toMillis();
+      } else if (typeof historyFromTimestamp.seconds === 'number') {
+        histMillis = historyFromTimestamp.seconds * 1000;
+      }
+    }
+    let clearedMillis = 0;
+    if (clearedAtTimestamp) {
+      if (typeof clearedAtTimestamp.toMillis === 'function') {
+        clearedMillis = clearedAtTimestamp.toMillis();
+      } else if (typeof clearedAtTimestamp.seconds === 'number') {
+        clearedMillis = clearedAtTimestamp.seconds * 1000;
+      }
+    }
+    const maxMillis = Math.max(histMillis, clearedMillis);
+    lowerBound = Timestamp.fromMillis(maxMillis);
+  }
 
   const q = lowerBound
     ? query(
@@ -1400,6 +1499,7 @@ export async function moderatorRemoveChatMessage(
   });
 }
 
+
 /**
  * Fetch a single message doc by ID (used for reviewing reported message by ID)
  */
@@ -1705,6 +1805,27 @@ export async function updateUserStatusInFirestore(
     status,
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Permanently delete a user account from Firestore (Admin only)
+ * Deletes user profile document from users/{userId} and directory/{userId}
+ */
+export async function deleteUserAccountFromFirestore(userId: string): Promise<void> {
+  const userPath = `users/${userId}`;
+  try {
+    const userRef = doc(db, 'users', userId);
+    await deleteDoc(userRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, userPath);
+  }
+
+  try {
+    const dirRef = doc(db, 'directory', userId);
+    await deleteDoc(dirRef);
+  } catch (err: any) {
+    console.warn('Note on deleting directory document:', err);
+  }
 }
 
 /**

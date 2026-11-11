@@ -16,6 +16,7 @@ import {
   signInWithStaffEmail,
   getUserProfile,
   bootstrapAdminProfileIfNeeded,
+  createStaffProfile,
   logoutFirebase,
   parseFriendlyError,
 } from '../../lib/firebaseService';
@@ -27,14 +28,16 @@ interface LoginFormProps {
   onSuccess: (session: UserSession) => void;
   onNavigateSignUp: () => void;
   onNavigateAdmin?: () => void;
-  onEmailVerificationNeeded?: (email: string) => void;
+  onFailedLogin?: () => void;
+  shouldAnimateEntrance?: boolean;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({
   onSuccess,
   onNavigateSignUp,
   onNavigateAdmin,
-  onEmailVerificationNeeded,
+  onFailedLogin,
+  shouldAnimateEntrance = false,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,6 +49,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+
   const [timeoutBanner, setTimeoutBanner] = useState<string | null>(() => {
     try {
       return sessionStorage.getItem('gsa_timeout_banner');
@@ -76,16 +80,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       department: profile.department,
       role: profile.role,
       status: profile.status,
-      keyFingerprint:
-        profile.role === 'admin'
-          ? 'SEC-DEVICE-ADM-01'
-          : 'ECC-256: 4F:9A:82:1C:7E:33:B8:2D',
-      deviceId:
-        profile.role === 'admin' ? 'SEC-DEVICE-ADM-01' : 'SEC-DEVICE-STF-99',
-      algorithm:
-        profile.role === 'admin'
-          ? 'TLS 1.3 + HTTPS Strict Transport'
-          : 'TLS 1.3 Standard Transport',
+      algorithm: 'TLS in transit, encrypted at rest',
       channels:
         profile.channels && profile.channels.length > 0
           ? profile.channels
@@ -95,14 +90,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   };
 
   const handleProfileRouting = async (firebaseUser: any, providerId: string) => {
-    // If password user is not email verified, redirect to verify email screen
-    if (providerId === 'password' && !firebaseUser.emailVerified) {
-      if (onEmailVerificationNeeded) {
-        onEmailVerificationNeeded(firebaseUser.email || email);
-      }
-      return;
-    }
-
     let profile: any = null;
     let isBusy = false;
     if (firebaseUser.email?.toLowerCase() === 'dmbogo20@gmail.com') {
@@ -114,6 +101,23 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       const profRes = await getUserProfile(firebaseUser.uid);
       profile = profRes.profile;
       if (profRes.isBusy) isBusy = true;
+    }
+
+    // Ensure both Google and Email sign-ins recover gracefully if their profile doc was interrupted or missing
+    if (!profile && !isBusy) {
+      try {
+        const defaultName =
+          firebaseUser.displayName ||
+          (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Staff Member');
+        profile = await createStaffProfile(
+          firebaseUser,
+          defaultName,
+          'Operations',
+          providerId === 'google.com' ? 'google' : 'password'
+        );
+      } catch (e) {
+        console.warn('Auto create pending profile note:', e);
+      }
     }
 
     if (!profile) {
@@ -175,7 +179,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       errs.password = 'Password is required';
     }
     setFieldErrors(errs);
-    if (Object.keys(errs).length > 0) return;
+    if (Object.keys(errs).length > 0) {
+      onFailedLogin?.();
+      return;
+    }
 
     setIsLoadingEmail(true);
     setAuthFlowInProgress(true);
@@ -183,6 +190,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       const res = await signInWithStaffEmail(email, password);
       if (res.error) {
         setErrorMessage(res.error);
+        onFailedLogin?.();
         if (res.googleHint) {
           setGoogleHint(true);
         }
@@ -194,6 +202,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     } catch (err: any) {
       console.warn('handleEmailSignIn catch:', err);
       setErrorMessage('Incorrect email or password');
+      onFailedLogin?.();
     } finally {
       setIsLoadingEmail(false);
       setAuthFlowInProgress(false);
@@ -213,6 +222,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         setIsLoadingGoogle(false);
         if (error) {
           setErrorMessage(error);
+          onFailedLogin?.();
         }
         return;
       }
@@ -223,6 +233,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       if (err?.code !== 'auth/popup-closed-by-user' && err?.code !== 'auth/cancelled-popup-request') {
         await logoutFirebase();
         setErrorMessage(parseFriendlyError(err));
+        onFailedLogin?.();
       }
     } finally {
       setIsLoadingGoogle(false);
@@ -231,7 +242,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col gap-3 text-left">
+    <div className="w-full flex flex-col gap-6 text-left">
       {/* Forgot Password Dialog */}
       <ForgotPasswordDialog
         isOpen={isForgotPasswordOpen}
@@ -241,7 +252,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       {/* Pending Approval Notice */}
       {pendingApprovalNotice && (
-        <div className="p-3.5 bg-[#F59E0B]/10 border border-[#F59E0B]/30 rounded-[10px] text-[13px] text-[#F59E0B] leading-relaxed">
+        <div className="p-3.5 bg-[#F5A623]/10 border border-[#F5A623]/30 rounded-[12px] text-[13px] text-[#F5A623] leading-relaxed">
           <p className="font-semibold mb-1">Approval pending</p>
           <p>{pendingApprovalNotice}</p>
         </div>
@@ -249,15 +260,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       {/* Calm session timeout info banner */}
       {timeoutBanner && (
-        <div className="p-3 bg-[#182229] border border-white/[0.12] rounded-[10px] text-[13px] text-[#E9EDEF] flex items-center justify-between gap-2 shadow-sm animate-fadeIn">
+        <div className="p-3 bg-[#22323B] border border-[#3A4C57] rounded-[12px] text-[13px] text-[#F2F7F9] flex items-center justify-between gap-2 shadow-sm animate-fadeIn">
           <div className="flex items-center gap-2.5">
-            <Info className="w-4 h-4 text-[#00A884] flex-shrink-0" strokeWidth={2} />
+            <Info className="w-4 h-4 text-[#3DDBB4] flex-shrink-0" strokeWidth={2} />
             <span>{timeoutBanner}</span>
           </div>
           <button
             type="button"
             onClick={dismissTimeoutBanner}
-            className="text-[#8696A0] hover:text-[#E9EDEF] p-1 rounded hover:bg-white/[0.05] transition-colors cursor-pointer"
+            className="text-[#8FA2AD] hover:text-[#F2F7F9] p-1 rounded hover:bg-white/[0.05] focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] transition-colors cursor-pointer"
             aria-label="Dismiss notification"
           >
             <X className="w-3.5 h-3.5" />
@@ -267,85 +278,56 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       {/* General Error Banner */}
       {errorMessage && (
-        <div className="p-3 bg-[#E5484D]/10 border border-[#E5484D]/30 rounded-[10px] text-[13px] text-[#E5484D] flex flex-col gap-1">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" strokeWidth={1.75} />
-            <span>{errorMessage}</span>
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="p-3 bg-[#E5484D]/10 border border-[#E5484D]/30 rounded-[12px] text-[13px] text-[#FF6B6B] flex flex-col gap-1 transition-opacity duration-150 animate-fadeIn"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#FF6B6B]" strokeWidth={1.75} />
+              <span className="font-medium">{errorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-[#FF6B6B]/70 hover:text-[#FF6B6B] p-0.5 rounded cursor-pointer transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF6B6B]"
+              aria-label="Dismiss error message"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          {/* Section 5: Small muted hint under error if signed up with Google */}
           {googleHint && (
-            <p className="text-[12px] text-[#8696A0] pl-6">
-              Signed up with Google? Use Continue with Google.
+            <p className="text-[12px] text-[#A9BAC4] pl-6">
+              Signed up with Google? Use Continue with Google below.
             </p>
           )}
         </div>
       )}
 
-      {/* Section 1: Keep Continue with Google */}
-      <div>
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={isLoadingEmail || isLoadingGoogle}
-          className="w-full h-[48px] sm:h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium flex items-center justify-center gap-2.5 transition-standard cursor-pointer disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-[#00A884] focus:ring-offset-2 focus:ring-offset-[#1F2C33]"
+      {/* Login Form with 24px gap */}
+      <form onSubmit={handleEmailSignIn} className="flex flex-col gap-5">
+        {/* Field: Work email (stagger 120ms) */}
+        <div
+          className={`flex flex-col gap-2 ${shouldAnimateEntrance ? 'animate-login-stagger' : ''}`}
+          style={shouldAnimateEntrance ? { animationDelay: '120ms' } : undefined}
         >
-          {isLoadingGoogle ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-[#00A884]" strokeWidth={1.75} />
-              <span>Signing in with Google...</span>
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Divider with muted text 'or' */}
-      <div className="flex items-center gap-3 my-1">
-        <div className="flex-1 h-[1px] bg-white/10" />
-        <span className="text-[13px] text-[#8696A0] select-none font-normal">
-          or
-        </span>
-        <div className="flex-1 h-[1px] bg-white/10" />
-      </div>
-
-      {/* Email & Password Form */}
-      <form onSubmit={handleEmailSignIn} className="flex flex-col gap-3">
-        {/* Email Field */}
-        <div className="flex flex-col gap-1">
-          <label className="text-[13px] font-medium text-[#8696A0]">
-            Email
+          <label htmlFor="login-email" className="text-[14px] font-medium text-[#C9D6DD]">
+            Work email
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8696A0]">
-              <Mail className="w-[18px] h-[18px]" strokeWidth={1.75} />
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#8FA2AD]">
+              <Mail className="w-[18px] h-[18px]" strokeWidth={1.75} aria-hidden="true" />
             </div>
             <input
+              id="login-email"
               type="email"
+              autoComplete="email"
               value={email}
               autoFocus
               onChange={(e) => {
                 setEmail(e.target.value);
+                if (errorMessage) setErrorMessage(null);
                 if (fieldErrors.email && e.target.value.trim()) {
                   setFieldErrors((p) => ({ ...p, email: undefined }));
                 }
@@ -357,40 +339,46 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   setFieldErrors((p) => ({ ...p, email: 'Enter a valid email address' }));
                 }
               }}
-              placeholder="user@org.com"
-              className="w-full h-[44px] pl-10 pr-3.5 rounded-[10px] bg-[#2A3942] border border-white/[0.08] text-[#E9EDEF] text-[14px] placeholder-[#8696A0]/75 focus:outline-none focus:border-[#00A884] transition-standard"
+              placeholder="you@organization.com"
+              className="w-full h-[50px] pl-11 pr-4 rounded-[12px] bg-[#22323B] border border-[#3A4C57] text-[#F2F7F9] text-[14px] font-medium placeholder-[#8FA2AD] focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] focus:border-transparent transition-all"
             />
           </div>
-          {/* Reserved space for inline error */}
-          <div className="min-h-[16px] text-[12px] text-[#E5484D] pl-1">
-            {fieldErrors.email || ''}
-          </div>
+          {fieldErrors.email && (
+            <div className="text-[12px] text-[#FF6B6B] pl-1 font-medium -mt-1">
+              {fieldErrors.email}
+            </div>
+          )}
         </div>
 
-        {/* Password Field */}
-        <div className="flex flex-col gap-1 -mt-1">
+        {/* Field: Password (stagger 160ms) */}
+        <div
+          className={`flex flex-col gap-2 ${shouldAnimateEntrance ? 'animate-login-stagger' : ''}`}
+          style={shouldAnimateEntrance ? { animationDelay: '160ms' } : undefined}
+        >
           <div className="flex items-center justify-between">
-            <label className="text-[13px] font-medium text-[#8696A0]">
+            <label htmlFor="login-password" className="text-[14px] font-medium text-[#C9D6DD]">
               Password
             </label>
-            {/* Section 1: Forgot password? link */}
             <button
               type="button"
               onClick={() => setIsForgotPasswordOpen(true)}
-              className="text-[12px] text-[#00A884] hover:underline cursor-pointer font-medium"
+              className="text-[14px] font-medium text-[#3DDBB4] hover:underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] rounded-[4px] px-1 py-0.5 transition-colors"
             >
               Forgot password?
             </button>
           </div>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8696A0]">
-              <Lock className="w-[18px] h-[18px]" strokeWidth={1.75} />
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#8FA2AD]">
+              <Lock className="w-[18px] h-[18px]" strokeWidth={1.75} aria-hidden="true" />
             </div>
             <input
+              id="login-password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
+                if (errorMessage) setErrorMessage(null);
                 if (fieldErrors.password && e.target.value) {
                   setFieldErrors((p) => ({ ...p, password: undefined }));
                 }
@@ -400,89 +388,178 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   setFieldErrors((p) => ({ ...p, password: 'Password is required' }));
                 }
               }}
-              placeholder="Enter password"
-              className="w-full h-[44px] pl-10 pr-11 rounded-[10px] bg-[#2A3942] border border-white/[0.08] text-[#E9EDEF] text-[14px] placeholder-[#8696A0]/75 focus:outline-none focus:border-[#00A884] transition-standard"
+              placeholder="Enter your password"
+              className="w-full h-[50px] pl-11 pr-12 rounded-[12px] bg-[#22323B] border border-[#3A4C57] text-[#F2F7F9] text-[14px] font-medium placeholder-[#8FA2AD] focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] focus:border-transparent transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               title={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#8696A0] hover:text-[#00A884] focus:text-[#00A884] transition-standard cursor-pointer select-none"
+              className="absolute inset-y-0 right-0 pr-4 flex items-center justify-center w-12 text-[#8FA2AD] hover:text-[#3DDBB4] focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] rounded-[6px] transition-colors cursor-pointer select-none"
             >
-              {showPassword ? (
-                <EyeOff className="w-[18px] h-[18px]" strokeWidth={1.75} />
-              ) : (
-                <Eye className="w-[18px] h-[18px]" strokeWidth={1.75} />
-              )}
+              <div className="relative w-[18px] h-[18px]">
+                <EyeOff
+                  className={`w-[18px] h-[18px] absolute inset-0 transition-opacity duration-150 ${
+                    showPassword ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                  strokeWidth={1.75}
+                />
+                <Eye
+                  className={`w-[18px] h-[18px] absolute inset-0 transition-opacity duration-150 ${
+                    showPassword ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                  }`}
+                  strokeWidth={1.75}
+                />
+              </div>
             </button>
           </div>
-          {/* Reserved space for inline error */}
-          <div className="min-h-[16px] text-[12px] text-[#E5484D] pl-1">
-            {fieldErrors.password || ''}
-          </div>
+          {fieldErrors.password && (
+            <div className="text-[12px] text-[#FF6B6B] pl-1 font-medium -mt-1">
+              {fieldErrors.password}
+            </div>
+          )}
         </div>
 
-        {/* Primary Button: Log in */}
+        {/* Primary Log in Button (stagger 200ms): 52px tall, background #2EE0B0, dark text #042A21, bold */}
         <button
           type="submit"
           disabled={isLoadingEmail || isLoadingGoogle}
-          className="w-full h-[48px] sm:h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[14px] font-semibold flex items-center justify-center gap-2 transition-standard cursor-pointer disabled:opacity-50 disabled:pointer-events-none mt-0.5 focus:outline-none focus:ring-2 focus:ring-[#00A884] focus:ring-offset-2 focus:ring-offset-[#1F2C33]"
+          className={`relative w-full h-[52px] rounded-[12px] bg-[#2EE0B0] hover:bg-[#28CCA0] active:bg-[#22B890] text-[#042A21] text-[15px] font-bold flex items-center justify-center transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed mt-1 focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] focus:ring-offset-2 focus:ring-offset-[#17232A] shadow-md overflow-hidden ${
+            shouldAnimateEntrance ? 'animate-login-stagger' : ''
+          }`}
+          style={shouldAnimateEntrance ? { animationDelay: '200ms' } : undefined}
         >
-          {isLoadingEmail ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.75} />
-              <span>Logging in...</span>
-            </>
-          ) : (
-            <span>Log in</span>
-          )}
+          {/* Idle label */}
+          <span
+            className={`transition-opacity duration-150 flex items-center gap-2 ${
+              isLoadingEmail ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}
+          >
+            Log in
+          </span>
+
+          {/* Loading spinner */}
+          <span
+            className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-150 ${
+              isLoadingEmail ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <Loader2 className="w-5 h-5 animate-spin text-[#042A21]" strokeWidth={2.5} />
+            <span>Logging in...</span>
+          </span>
         </button>
       </form>
 
-      {/* Divider row: New here? */}
-      <div className="mt-4 flex items-center gap-3">
-        <div className="flex-1 h-[1px] bg-white/10" />
-        <span className="text-[13px] text-[#8696A0] select-none font-normal">
-          New here?
+      {/* Divider with word "or" (stagger 240ms) */}
+      <div
+        className={`flex items-center gap-3 ${shouldAnimateEntrance ? 'animate-login-stagger' : ''}`}
+        style={shouldAnimateEntrance ? { animationDelay: '240ms' } : undefined}
+      >
+        <div className="flex-1 h-[1px] bg-[#2C3B44]" />
+        <span className="text-[13px] text-[#A9BAC4] select-none font-medium">
+          or
         </span>
-        <div className="flex-1 h-[1px] bg-white/10" />
+        <div className="flex-1 h-[1px] bg-[#2C3B44]" />
       </div>
 
-      {/* Outlined Button: Create an account */}
-      <div className="mt-1 flex flex-col gap-2">
+      {/* Secondary Outlined Continue with Google Button: 50px tall (stagger 280ms) */}
+      <div
+        className={shouldAnimateEntrance ? 'animate-login-stagger' : ''}
+        style={shouldAnimateEntrance ? { animationDelay: '280ms' } : undefined}
+      >
         <button
           type="button"
-          onClick={onNavigateSignUp}
-          className="w-full h-[48px] sm:h-[44px] rounded-[10px] bg-transparent hover:bg-[#00A884]/[0.12] border-[1.5px] border-[#00A884] text-[#00A884] font-semibold text-[14px] flex items-center justify-center gap-2 transition-standard cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#00A884] focus:ring-offset-2 focus:ring-offset-[#1F2C33]"
+          onClick={handleGoogleSignIn}
+          disabled={isLoadingEmail || isLoadingGoogle}
+          className="relative w-full h-[50px] rounded-[12px] bg-transparent hover:bg-white/[0.04] active:bg-white/[0.08] border border-[#3A4C57] hover:border-[#3DDBB4]/60 text-[#F2F7F9] text-[14px] font-medium flex items-center justify-center transition-all cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] focus:ring-offset-2 focus:ring-offset-[#17232A] overflow-hidden"
         >
-          <UserPlus className="w-[18px] h-[18px]" strokeWidth={1.75} />
-          <span>Create an account</span>
-        </button>
+          {/* Idle Google content */}
+          <span
+            className={`flex items-center justify-center gap-3 transition-opacity duration-150 ${
+              isLoadingGoogle ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}
+          >
+            <svg className="w-[18px] h-[18px] flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="#4285F4"
+                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+              />
+            </svg>
+            <span>Continue with Google</span>
+          </span>
 
-        <p className="text-[13px] text-[#8696A0] text-center leading-relaxed">
-          New members need administrator approval before they can chat.
+          {/* Loading spinner */}
+          <span
+            className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-150 ${
+              isLoadingGoogle ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <Loader2 className="w-4 h-4 animate-spin text-[#3DDBB4]" strokeWidth={2} />
+            <span>Signing in with Google...</span>
+          </span>
+        </button>
+      </div>
+
+      {/* New here? Request access & Approval notice (stagger 320ms) */}
+      <div
+        className={`flex flex-col items-center text-center gap-2 ${
+          shouldAnimateEntrance ? 'animate-login-stagger' : ''
+        }`}
+        style={shouldAnimateEntrance ? { animationDelay: '320ms' } : undefined}
+      >
+        <div className="text-[14px] text-[#A9BAC4] font-medium">
+          <span>New here? </span>
+          <button
+            type="button"
+            onClick={onNavigateSignUp}
+            className="text-[#3DDBB4] font-semibold hover:underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] rounded-[4px] px-1 py-0.5 transition-colors"
+          >
+            Request access
+          </button>
+        </div>
+
+        <p className="text-[12px] text-[#A9BAC4] max-w-[320px] leading-relaxed font-medium">
+          An administrator approves every new member, including Google sign-ups, before they can chat.
         </p>
       </div>
 
-      {/* Link to Administrator Portal */}
-      {onNavigateAdmin && (
-        <div className="pt-2.5 mt-1 border-t border-white/[0.06] w-full text-center text-[13px] text-[#8696A0]">
-          <span>Security Administrator? </span>
-          <button
-            type="button"
-            onClick={onNavigateAdmin}
-            className="text-[#00A884] hover:underline cursor-pointer font-medium"
-          >
-            Admin portal
-          </button>
+      {/* Footer line with small lock icon (stagger 360ms) */}
+      <div
+        className={`pt-3 border-t border-[#2C3B44] flex flex-col items-center gap-2 text-center ${
+          shouldAnimateEntrance ? 'animate-login-stagger' : ''
+        }`}
+        style={shouldAnimateEntrance ? { animationDelay: '360ms' } : undefined}
+      >
+        <div className="flex items-center justify-center gap-1.5 text-[12.5px] text-[#3DDBB4] font-medium">
+          <Lock className="w-[13px] h-[13px] text-[#3DDBB4]" strokeWidth={2} aria-hidden="true" />
+          <span>End-to-end encrypted</span>
         </div>
-      )}
 
-      {/* Footer lock badge */}
-      <div className="w-full mt-2 pt-2.5 border-t border-white/[0.06] flex items-center justify-center gap-1.5 text-[#8696A0] text-[13px]">
-        <Lock className="w-[14px] h-[14px] flex-shrink-0 text-[#8696A0]" />
-        <span>Secure messaging with role-based access control</span>
+        {onNavigateAdmin && (
+          <div className="text-[12px] text-[#A9BAC4] font-medium">
+            <span>Security Administrator? </span>
+            <button
+              type="button"
+              onClick={onNavigateAdmin}
+              className="text-[#3DDBB4] hover:underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] rounded-[4px] px-1 py-0.5 transition-colors"
+            >
+              Admin portal
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

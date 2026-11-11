@@ -3,8 +3,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import {
   initializeFirestore,
   getFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -21,24 +20,43 @@ if (firebaseConfigError) {
   console.error(firebaseConfigError);
 }
 
+// Clean up any stale multi-tab manager entries left in localStorage from previous sessions
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    for (let i = window.localStorage.length - 1; i >= 0; i--) {
+      const key = window.localStorage.key(i);
+      if (
+        key &&
+        (key.startsWith('firestore_clients_') ||
+          key.startsWith('firestore_zombied_') ||
+          key.startsWith('firestore_mutations_') ||
+          key.startsWith('firestore_'))
+      ) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch (_) {
+    // Ignore storage quota or access errors in restricted iframe environments
+  }
+}
+
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Enable offline persistence with multiple tab manager support
+// Initialize Firestore with memoryLocalCache to eliminate localStorage quota failures
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(
     app,
     {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
+      localCache: memoryLocalCache(),
     },
     firebaseConfig.firestoreDatabaseId || '(default)'
   );
 } catch {
   firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
 }
+
 export const db = firestoreDb;
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });

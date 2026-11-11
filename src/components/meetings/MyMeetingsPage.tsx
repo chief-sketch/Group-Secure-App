@@ -108,38 +108,46 @@ export const MyMeetingsPage: React.FC<MyMeetingsPageProps> = ({
     };
   }, [myMeetings, currentUser.uid]);
 
-  // Group into Today, Tomorrow, and Later
+  // Group into Today, Tomorrow, Later, and Past
   const grouped = (() => {
     const today: EnrichedMyMeeting[] = [];
     const tomorrow: EnrichedMyMeeting[] = [];
     const later: EnrichedMyMeeting[] = [];
+    const past: EnrichedMyMeeting[] = [];
 
     const now = new Date();
-    const todayDateStr = now.toDateString();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfTomorrow = startOfToday + 86400000;
+    const startOfDayAfter = startOfTomorrow + 86400000;
 
-    const tmrw = new Date(now);
-    tmrw.setDate(tmrw.getDate() + 1);
-    const tmrwDateStr = tmrw.toDateString();
+    const getTimeMs = (item: EnrichedMyMeeting): number => {
+      const startsAtVal = item.fullDoc?.startsAt || item.myMeeting.startsAt;
+      if (typeof startsAtVal?.toMillis === 'function') return startsAtVal.toMillis();
+      if (typeof startsAtVal?.toDate === 'function') return startsAtVal.toDate().getTime();
+      if (typeof startsAtVal?.seconds === 'number') return startsAtVal.seconds * 1000;
+      return new Date(startsAtVal || Date.now()).getTime();
+    };
 
     for (const item of enrichedMeetings) {
-      const startsAtVal = item.fullDoc?.startsAt || item.myMeeting.startsAt;
-      const date: Date = (() => {
-        if (startsAtVal?.toDate) return startsAtVal.toDate();
-        if (startsAtVal?.seconds) return new Date(startsAtVal.seconds * 1000);
-        return new Date(startsAtVal || Date.now());
-      })();
-
-      const dateStr = date.toDateString();
-      if (dateStr === todayDateStr) {
+      const timeMs = getTimeMs(item);
+      if (timeMs < startOfToday) {
+        past.push(item);
+      } else if (timeMs < startOfTomorrow) {
         today.push(item);
-      } else if (dateStr === tmrwDateStr) {
+      } else if (timeMs < startOfDayAfter) {
         tomorrow.push(item);
       } else {
         later.push(item);
       }
     }
 
-    return { today, tomorrow, later };
+    const sortFn = (a: EnrichedMyMeeting, b: EnrichedMyMeeting) => getTimeMs(a) - getTimeMs(b);
+    today.sort(sortFn);
+    tomorrow.sort(sortFn);
+    later.sort(sortFn);
+    past.sort((a, b) => getTimeMs(b) - getTimeMs(a)); // Most recent past first
+
+    return { today, tomorrow, later, past };
   })();
 
   const handleRsvp = async (meetingId: string, status: MeetingRsvpStatus) => {
@@ -206,7 +214,7 @@ export const MyMeetingsPage: React.FC<MyMeetingsPageProps> = ({
     showToast('Meeting cancelled');
   };
 
-  const totalMeetings = enrichedMeetings.length;
+  const totalMeetings = grouped.today.length + grouped.tomorrow.length + grouped.later.length;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0B141A] overflow-hidden select-none">
@@ -231,7 +239,7 @@ export const MyMeetingsPage: React.FC<MyMeetingsPageProps> = ({
             <button
               type="button"
               onClick={onBack}
-              className="w-10 h-10 flex items-center justify-center text-[#8696A0] hover:text-[#E9EDEF] rounded-full hover:bg-white/[0.05] transition-standard cursor-pointer -ml-1"
+              className="w-11 h-11 flex items-center justify-center text-[#8696A0] hover:text-[#E9EDEF] rounded-full hover:bg-white/[0.05] transition-standard cursor-pointer -ml-1"
               aria-label="Back to conversations"
             >
               <ArrowLeft className="w-5 h-5" strokeWidth={1.75} />
@@ -262,7 +270,7 @@ export const MyMeetingsPage: React.FC<MyMeetingsPageProps> = ({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 max-w-4xl mx-auto w-full pb-safe">
         {loadingDetails && enrichedMeetings.length === 0 ? (
           <div className="py-20 flex flex-col items-center justify-center text-center">
             <Loader2 className="w-8 h-8 text-[#00A884] animate-spin mb-3" />
@@ -385,6 +393,52 @@ export const MyMeetingsPage: React.FC<MyMeetingsPageProps> = ({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {grouped.later.map((item) => (
+                    <MeetingCard
+                      key={item.myMeeting.id}
+                      meeting={
+                        item.fullDoc || {
+                          id: item.myMeeting.id,
+                          title: item.myMeeting.title,
+                          startsAt: item.myMeeting.startsAt,
+                          durationMinutes: 30,
+                          status: 'scheduled',
+                          createdBy: '',
+                          createdByName: 'User',
+                          createdAt: null,
+                          rsvp: {},
+                        }
+                      }
+                      currentUser={currentUser}
+                      conversationName={item.myMeeting.conversationName}
+                      conversationType={item.myMeeting.conversationType}
+                      conversationId={item.myMeeting.conversationId}
+                      showConversationBadge={true}
+                      onRsvp={handleRsvp}
+                      onEdit={(m) => setEditingMeeting(m)}
+                      onCancel={handleCancel}
+                      onOpenConversation={() =>
+                        openMeetingConversation(
+                          item.myMeeting.conversationType,
+                          item.myMeeting.conversationId
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Group: Past */}
+            {grouped.past.length > 0 && (
+              <div className="space-y-3 pt-3 border-t border-white/[0.06] opacity-80">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#8696A0]/60" />
+                  <h3 className="text-[13px] font-semibold text-[#8696A0] uppercase tracking-wider">
+                    Past ({grouped.past.length})
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {grouped.past.map((item) => (
                     <MeetingCard
                       key={item.myMeeting.id}
                       meeting={

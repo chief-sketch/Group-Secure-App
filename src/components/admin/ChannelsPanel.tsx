@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Edit2, Users } from 'lucide-react';
+import { Edit2, Users, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ChannelAvatar } from '../common/ChannelAvatar';
 import { EditChannelDialog } from './EditChannelDialog';
+import { ClearChannelDialog } from '../chat/ClearChannelDialog';
 import {
   normalizeChannelId,
   getChannelDisplayName,
@@ -13,6 +14,7 @@ import { ChannelDoc } from '../../types';
 export const ChannelsPanel: React.FC = () => {
   const { channelsList, users } = useApp();
   const [editingChannel, setEditingChannel] = useState<ChannelDoc | null>(null);
+  const [clearingChannel, setClearingChannel] = useState<ChannelDoc | null>(null);
   const editButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Merge default channels with any custom channel docs from Firestore
@@ -62,7 +64,7 @@ export const ChannelsPanel: React.FC = () => {
             Channels
           </h1>
           <p className="text-[13px] text-[#8696A0] mt-1">
-            Configure channel avatars, visual branding, and descriptions for staff discovery.
+            Configure channel avatars, visual branding, descriptions, and manage message retention and clearance.
           </p>
         </div>
       </div>
@@ -91,32 +93,55 @@ export const ChannelsPanel: React.FC = () => {
                       <Users className="w-3 h-3 text-[#00A884]" />
                       <span>{memberCount} member{memberCount === 1 ? '' : 's'}</span>
                     </span>
+                    {ch.clearedAt && (
+                      <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[#E5484D]/15 text-[#FF6B6B] border border-[#E5484D]/30">
+                        History reset
+                      </span>
+                    )}
                   </div>
 
                   <p className="text-[13px] text-[#8696A0] truncate mt-0.5 max-w-xl">
                     {ch.description || 'No description set'}
                   </p>
 
-                  <div className="sm:hidden text-[11px] text-[#8696A0] mt-1 flex items-center gap-1">
-                    <Users className="w-3 h-3 text-[#00A884]" />
-                    <span>{memberCount} member{memberCount === 1 ? '' : 's'}</span>
+                  <div className="sm:hidden text-[11px] text-[#8696A0] mt-1 flex items-center gap-2">
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3 h-3 text-[#00A884]" />
+                      <span>{memberCount} member{memberCount === 1 ? '' : 's'}</span>
+                    </span>
+                    {ch.clearedAt && (
+                      <span className="text-[#FF6B6B]">• Reset</span>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Edit button */}
-              <button
-                ref={(el) => {
-                  editButtonRefs.current[ch.id] = el;
-                }}
-                type="button"
-                onClick={() => setEditingChannel(ch)}
-                className="h-[36px] px-3.5 rounded-[8px] bg-[#2A3942] hover:bg-[#34454F] border border-white/[0.08] text-[#E9EDEF] text-[13px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 flex-shrink-0"
-                aria-label={`Edit ${displayName} channel`}
-              >
-                <Edit2 className="w-3.5 h-3.5 text-[#00A884]" />
-                <span>Edit</span>
-              </button>
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setClearingChannel(ch)}
+                  className="h-[36px] px-3.5 rounded-[8px] bg-[#E5484D]/15 hover:bg-[#E5484D]/25 border border-[#E5484D]/30 text-[#FF6B6B] text-[13px] font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                  aria-label={`Clear ${displayName} channel messages`}
+                  title={`Clear all messages for everyone in #${displayName}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Clear chat</span>
+                </button>
+
+                <button
+                  ref={(el) => {
+                    editButtonRefs.current[ch.id] = el;
+                  }}
+                  type="button"
+                  onClick={() => setEditingChannel(ch)}
+                  className="h-[36px] px-3.5 rounded-[8px] bg-[#2A3942] hover:bg-[#34454F] border border-white/[0.08] text-[#E9EDEF] text-[13px] font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                  aria-label={`Edit ${displayName} channel`}
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-[#00A884]" />
+                  <span>Edit</span>
+                </button>
+              </div>
             </div>
           );
         })}
@@ -131,6 +156,16 @@ export const ChannelsPanel: React.FC = () => {
           returnFocusRef={{
             current: editButtonRefs.current[editingChannel.id] || null,
           }}
+        />
+      )}
+
+      {/* Clear Channel Dialog */}
+      {clearingChannel && (
+        <ClearChannelDialog
+          isOpen={clearingChannel !== null}
+          channelId={clearingChannel.id}
+          channelName={clearingChannel.name || clearingChannel.id}
+          onClose={() => setClearingChannel(null)}
         />
       )}
     </div>

@@ -58,12 +58,12 @@ export const RemoveMessageDialog: React.FC<RemoveMessageDialogProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget && !isRemoving) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 transition-standard animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[420px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] shadow-2xl p-6 text-left select-none outline-none"
+        className="w-full max-w-[420px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left select-none outline-none modal-content-animate"
       >
         <div className="w-11 h-11 rounded-full bg-[#E5484D]/15 border border-[#E5484D]/30 text-[#E5484D] flex items-center justify-center mx-auto mb-4">
           <ShieldAlert className="w-5 h-5" strokeWidth={1.75} />
@@ -95,7 +95,7 @@ export const RemoveMessageDialog: React.FC<RemoveMessageDialogProps> = ({
               onChange={(e) => setReason(e.target.value)}
               disabled={isRemoving}
               required
-              className="w-full h-[40px] px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] border border-white/[0.08] focus:border-[#00A884] focus:outline-none text-[13px] cursor-pointer transition-standard"
+              className="w-full h-[40px] px-3 rounded-[12px] bg-[#111B21] text-[#E9EDEF] border border-white/[0.08] focus:border-[#00A884] focus:outline-none text-[13px] cursor-pointer transition-standard"
             >
               {REMOVAL_REASONS.map((r) => (
                 <option key={r} value={r} className="bg-[#1F2C33]">
@@ -126,7 +126,7 @@ export const RemoveMessageDialog: React.FC<RemoveMessageDialogProps> = ({
               maxLength={200}
               rows={3}
               placeholder="Internal record only; never shown to members..."
-              className="w-full bg-[#111B21] border border-white/[0.08] rounded-[8px] p-3 text-[13px] text-[#E9EDEF] placeholder-[#8696A0]/60 focus:outline-none focus:border-[#00A884] transition-colors resize-none"
+              className="w-full bg-[#111B21] border border-white/[0.08] rounded-[12px] p-3 text-[13px] text-[#E9EDEF] placeholder-[#8696A0]/60 focus:outline-none focus:border-[#00A884] transition-colors resize-none"
             />
           </div>
 
@@ -135,14 +135,14 @@ export const RemoveMessageDialog: React.FC<RemoveMessageDialogProps> = ({
               type="button"
               onClick={onClose}
               disabled={isRemoving}
-              className="flex-1 px-4 py-2.5 rounded-[8px] bg-transparent hover:bg-white/[0.05] border border-white/[0.08] text-[13px] font-medium text-[#E9EDEF] transition-standard cursor-pointer disabled:opacity-50"
+              className="flex-1 px-4 py-2.5 rounded-[12px] bg-transparent hover:bg-white/[0.05] border border-white/[0.08] text-[13px] font-medium text-[#E9EDEF] transition-standard cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isRemoving || !reason}
-              className="flex-1 px-4 py-2.5 rounded-[8px] bg-[#E5484D] hover:bg-[#D93D42] text-[13px] font-medium text-white transition-standard cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+              className="flex-1 px-4 py-2.5 rounded-[12px] bg-[#E5484D] hover:bg-[#D93D42] text-[13px] font-medium text-white transition-standard cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
             >
               {isRemoving ? 'Removing...' : 'Remove message'}
             </button>

@@ -75,7 +75,7 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="change-password-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 transition-standard"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
@@ -83,7 +83,7 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[420px] bg-[#1F2C33] rounded-[14px] border border-white/[0.08] shadow-2xl p-6 text-left select-none relative animate-fadeIn outline-none"
+        className="w-full max-w-[420px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left select-none relative outline-none modal-content-animate"
       >
         <button
           type="button"
@@ -234,7 +234,7 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || !isValidNewPassword || !passwordsMatch}
-              className="w-full h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] disabled:opacity-50 text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center gap-2"
+              className="w-full h-[44px] rounded-[12px] bg-[#00A884] hover:bg-[#008F72] disabled:opacity-50 text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center gap-2 shadow-sm"
             >
               {isSubmitting ? (
                 <>
@@ -250,7 +250,7 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="w-full h-[40px] rounded-[10px] bg-transparent hover:bg-white/[0.05] text-[#8696A0] hover:text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
+              className="w-full h-[40px] rounded-[12px] bg-transparent hover:bg-white/[0.05] text-[#8696A0] hover:text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
             >
               Cancel
             </button>

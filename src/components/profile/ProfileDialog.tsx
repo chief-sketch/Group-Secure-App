@@ -300,12 +300,12 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSaving) handleClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate select-none"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[460px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left relative flex flex-col max-h-[90vh] overflow-y-auto scrollbar-thin outline-none"
+        className="w-full max-w-[460px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left relative flex flex-col max-h-[90vh] overflow-y-auto scrollbar-thin outline-none modal-content-animate"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06] mb-4">
@@ -535,7 +535,7 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({
             type="button"
             onClick={handleClose}
             disabled={isSaving}
-            className="flex-1 h-[42px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer disabled:opacity-50"
+            className="flex-1 h-[42px] rounded-[12px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
@@ -543,7 +543,7 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 h-[42px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-semibold transition-standard cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex-1 h-[42px] rounded-[12px] bg-[#00A884] hover:bg-[#008F72] text-white text-[13px] font-semibold transition-standard cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
           >
             {isSaving ? (
               <>

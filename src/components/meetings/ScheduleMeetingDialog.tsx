@@ -228,7 +228,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
       <div
         ref={containerRef}
         tabIndex={-1}
-        className="w-full max-w-[480px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-[480px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] max-h-[90dvh]"
       >
         {/* Dialog Header */}
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between flex-shrink-0 bg-[#202C33]">
@@ -268,7 +268,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               onBlur={() => validateField('title')}
               placeholder="e.g. Weekly Standup, Project Review"
-              className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-[13px] border ${
+              className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-base sm:text-[13px] border ${
                 errors.title ? 'border-[#E5484D]' : 'border-white/[0.08]'
               } focus:border-[#00A884] focus:outline-none transition-standard`}
             />
@@ -293,7 +293,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 onBlur={() => validateField('date')}
-                className="w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard"
+                className="w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-base sm:text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard"
               />
             </div>
 
@@ -308,7 +308,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 onBlur={() => validateField('time')}
-                className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-[13px] border ${
+                className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-base sm:text-[13px] border ${
                   errors.time ? 'border-[#E5484D]' : 'border-white/[0.08]'
                 } focus:border-[#00A884] focus:outline-none transition-standard`}
               />
@@ -333,7 +333,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
             <select
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
-              className="w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard cursor-pointer"
+              className="w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-base sm:text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard cursor-pointer"
             >
               <option value={15}>15 minutes</option>
               <option value={30}>30 minutes</option>
@@ -357,7 +357,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
               onChange={(e) => setLocation(e.target.value)}
               onBlur={() => validateField('location')}
               placeholder="e.g. Conference Room B, HQ 3rd Floor"
-              className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-[13px] border ${
+              className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-base sm:text-[13px] border ${
                 errors.location ? 'border-[#E5484D]' : 'border-white/[0.08]'
               } focus:border-[#00A884] focus:outline-none transition-standard`}
             />
@@ -382,7 +382,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
               onChange={(e) => setLink(e.target.value)}
               onBlur={() => validateField('link')}
               placeholder="https://meet.google.com/... or https://zoom.us/..."
-              className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-[13px] border ${
+              className={`w-full h-10 px-3 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-base sm:text-[13px] border ${
                 errors.link ? 'border-[#E5484D]' : 'border-white/[0.08]'
               } focus:border-[#00A884] focus:outline-none transition-standard`}
             />
@@ -410,7 +410,7 @@ export const ScheduleMeetingDialog: React.FC<ScheduleMeetingDialogProps> = ({
               onChange={(e) => setNote(e.target.value)}
               onBlur={() => validateField('note')}
               placeholder="Agenda items or preparation notes..."
-              className={`w-full p-2.5 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-[13px] border ${
+              className={`w-full p-2.5 rounded-[8px] bg-[#111B21] text-[#E9EDEF] text-base sm:text-[13px] border ${
                 errors.note ? 'border-[#E5484D]' : 'border-white/[0.08]'
               } focus:border-[#00A884] focus:outline-none transition-standard resize-none`}
             />

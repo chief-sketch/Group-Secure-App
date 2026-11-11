@@ -35,6 +35,7 @@ interface MessageBubbleProps {
   searchQuery?: string;
   isCurrentSearchResult?: boolean;
   isAdmin?: boolean;
+  isNewArrival?: boolean;
   onReply?: (message: ChatMessage) => void;
   onEdit?: (message: ChatMessage) => void;
   onDelete?: (message: ChatMessage) => void;
@@ -55,6 +56,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   searchQuery,
   isCurrentSearchResult = false,
   isAdmin = false,
+  isNewArrival = false,
   onReply,
   onEdit,
   onDelete,
@@ -63,7 +65,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onReplyClick,
   onRetry,
 }) => {
-  const { showToast, currentSession } = useApp();
+  const { showToast, currentSession, getDirectoryUser } = useApp();
   const {
     isOutgoing,
     senderName,
@@ -91,7 +93,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [showMenu, setShowMenu] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
-  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const arrivalAnimationClass = isNewArrival
+    ? isOutgoing
+      ? 'animate-message-outgoing'
+      : 'animate-message-incoming'
+    : '';
 
   // Close menu on click outside
   useEffect(() => {
@@ -239,7 +247,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <mark
             key={index}
             className={`rounded-[2px] px-0.5 text-inherit ${
-              isCurrentSearchResult ? 'bg-[#00A884] text-white font-medium' : 'bg-[#00A884]/35'
+              isCurrentSearchResult ? 'bg-[#20E39F] text-[#0A1A14] font-semibold' : 'bg-[#20E39F]/35 text-white'
             }`}
           >
             {part}
@@ -268,7 +276,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         id={`msg-${message.id}`}
         className={`flex w-full group relative transition-all duration-300 ${
           isOutgoing ? 'justify-end' : 'justify-start'
-        } ${isGrouped ? 'mt-[2px]' : 'mt-3'}`}
+        } ${isGrouped ? 'mt-[2px]' : 'mt-3'} ${arrivalAnimationClass}`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -291,7 +299,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {showMenu && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 bottom-full mb-1 z-30 bg-[#233138] rounded-[8px] border border-white/[0.08] shadow-xl py-1 w-36 select-none animate-fadeIn"
+                className="absolute right-0 bottom-full mb-1 z-30 bg-[#233138] rounded-[12px] border border-white/[0.08] shadow-xl py-1 w-36 select-none origin-bottom-right menu-popover-animate"
               >
                 {/* Reply */}
                 {onReply && (
@@ -351,17 +359,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         )}
 
+        {/* Left avatar for incoming messages */}
+        {!isOutgoing && !hideSenderHeader && (
+          <div className="flex-shrink-0 mr-2.5 self-end mb-1">
+            <Avatar
+              uid={message.senderId}
+              name={getDirectoryUser(message.senderId)?.displayName || senderName}
+              size={32}
+            />
+          </div>
+        )}
+        {!isOutgoing && hideSenderHeader && (
+          <div className="w-[32px] flex-shrink-0 mr-2.5" />
+        )}
+
         {/* Message Bubble Container */}
         <div
           title={timestamp}
-          className={`max-w-[85%] sm:max-w-[70%] rounded-[12px] px-3.5 py-2 text-[14px] leading-relaxed relative break-words [overflow-wrap:anywhere] shadow-sm transition-all duration-200 ${
+          className={`max-w-[85%] sm:max-w-[70%] rounded-[14px] px-3.5 py-2.5 text-[14px] leading-relaxed relative break-words [overflow-wrap:anywhere] shadow-sm transition-all duration-200 ${
             canModeratorRemove ? 'pr-8' : ''
           } ${
-            isCurrentSearchResult ? 'ring-2 ring-[#00A884]' : ''
+            isCurrentSearchResult ? 'ring-2 ring-[#20E39F]' : ''
           } ${
             isOutgoing
-              ? 'bg-[#005C4B] text-[#E9EDEF] rounded-tr-[4px]'
-              : 'bg-[#202C33] text-[#E9EDEF] rounded-tl-[4px]'
+              ? 'bg-[#0D382A] border border-[#20E39F]/20 text-[#E9EDEF] rounded-br-[4px]'
+              : 'bg-[#1B2930] border border-white/[0.04] text-[#E9EDEF] rounded-bl-[4px]'
           }`}
         >
           {/* Always-visible control for Admins on other people's non-deleted channel messages */}
@@ -387,7 +409,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             message.deletedBy === 'admin' ? (
               <div className="py-0.5 select-none">
                 <div className="flex items-center gap-2 text-[#8696A0] italic">
-                  <Shield className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.75} />
+                  <Shield className="w-3.5 h-3.5 text-[#20E39F] flex-shrink-0" strokeWidth={1.75} />
                   <span className="text-[13px]">Removed by an administrator</span>
                 </div>
                 {(isOutgoing || message.senderId === currentSession?.uid) && message.deletedReason && (
@@ -404,15 +426,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )
           ) : (
             <>
-              {/* Channel sender name with Avatar for incoming message */}
-              {!isOutgoing && isChannel && senderName && !hideSenderHeader && (
+              {/* Channel sender name for incoming message */}
+              {!isOutgoing && isChannel && (getDirectoryUser(message.senderId)?.displayName || senderName) && !hideSenderHeader && (
                 <div className="flex items-center gap-2 mb-1.5 pt-0.5">
-                  <Avatar uid={message.senderId} name={senderName} size={32} />
                   <div
-                    className="text-[12px] font-medium truncate select-none"
-                    style={{ color: senderColor || '#00A884' }}
+                    className="text-[12px] font-semibold truncate select-none text-[#20E39F]"
                   >
-                    {senderName}
+                    {getDirectoryUser(message.senderId)?.displayName || senderName}
                   </div>
                 </div>
               )}
@@ -421,10 +441,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {replyTo && (
                 <div
                   onClick={() => onReplyClick?.(replyTo.messageId)}
-                  className="mb-1.5 bg-black/20 hover:bg-black/30 border-l-[3px] border-[#00A884] rounded-[4px] px-2.5 py-1 cursor-pointer transition-colors select-none text-left"
+                  className="mb-1.5 bg-black/25 hover:bg-black/35 border-l-[3px] border-[#20E39F] rounded-[4px] px-2.5 py-1 cursor-pointer transition-colors select-none text-left"
                   title="Click to view original message"
                 >
-                  <div className="text-[12px] font-semibold text-[#00A884] truncate">
+                  <div className="text-[12px] font-semibold text-[#20E39F] truncate">
                     {replyTo.senderName}
                   </div>
                   <div className="text-[12px] text-[#8696A0] truncate">
@@ -463,18 +483,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </div>
               )}
 
-              {/* SECTION 5: DOCUMENT DISPLAY CARD */}
+              {/* SECTION 5: DOCUMENT DISPLAY CARD MATCHING MOCKUP */}
               {isDocument && (
                 <div className="mb-1.5 mt-0.5">
-                  <div className="flex items-center gap-3 bg-black/20 p-2.5 rounded-[8px] border border-white/[0.06] min-w-[200px] max-w-[320px]">
-                    <div className="w-10 h-10 rounded-[6px] bg-black/30 flex items-center justify-center flex-shrink-0 text-[#00A884]">
-                      <FileText className="w-5 h-5" strokeWidth={1.75} />
+                  <div className="flex items-center gap-3 bg-[#0D382A] border border-[#20E39F]/20 p-2.5 rounded-[12px] min-w-[200px] max-w-[320px] shadow-sm">
+                    {/* Square file badge (e.g. DOCX, PDF) */}
+                    <div className="w-10 h-10 rounded-[8px] bg-[#164E3E] flex items-center justify-center flex-shrink-0 text-[#20E39F] font-bold text-[11px] tracking-wider uppercase">
+                      {fileName?.split('.').pop()?.slice(0, 4) || 'DOC'}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-medium text-[#E9EDEF] truncate" title={fileName}>
+                      <div className="text-[13px] font-semibold text-white truncate" title={fileName}>
                         {fileName || 'Document'}
                       </div>
-                      <div className="text-[11px] text-[#8696A0] tabular-nums mt-0.5">
+                      <div className="text-[11px] text-[#20E39F]/80 font-medium tabular-nums mt-0.5">
                         {fileSize ? formatFileSize(fileSize) : ''}
                       </div>
                     </div>
@@ -484,12 +505,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                       type="button"
                       onClick={handleDocumentDownload}
                       disabled={isDownloadingDoc || message.isPending}
-                      className="p-1.5 text-[#8696A0] hover:text-[#00A884] transition-standard cursor-pointer rounded disabled:opacity-50"
+                      className="p-1.5 text-[#20E39F] hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer rounded-full disabled:opacity-50"
                       title="Download document"
                       aria-label="Download document"
                     >
                       {isDownloadingDoc ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-[#00A884]" />
+                        <Loader2 className="w-4 h-4 animate-spin text-[#20E39F]" />
                       ) : (
                         <Download className="w-4 h-4" strokeWidth={1.75} />
                       )}
@@ -500,15 +521,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
               {/* UPLOAD PROGRESS BAR WHILE SENDING */}
               {message.isPending && (
-                <div className="mt-1.5 mb-1 text-[11px] text-[#00A884] space-y-1">
+                <div className="mt-1.5 mb-1 text-[11px] text-[#20E39F] space-y-1">
                   <div className="flex justify-between font-mono text-[10px] tabular-nums">
                     <span>Sending...</span>
                     <span>{fileUploadProgress || 20}%</span>
                   </div>
                   <div className="w-full h-1.5 bg-black/30 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#00A884] transition-all duration-200 rounded-full"
-                      style={{ width: `${fileUploadProgress || 20}%` }}
+                      className="w-full h-full bg-[#20E39F] transition-transform duration-200 rounded-full"
+                      style={{
+                        transform: `scaleX(${Math.max(0.05, Math.min(1, (fileUploadProgress || 20) / 100))})`,
+                        transformOrigin: 'left',
+                      }}
                     />
                   </div>
                 </div>
@@ -516,7 +540,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
               {/* CAPTION DISPLAY UNDER FILE */}
               {text && (
-                <div className="whitespace-pre-wrap pr-1 pb-0.5 break-words [overflow-wrap:anywhere] mt-1">
+                <div className="whitespace-pre-wrap pr-1 pb-0.5 break-words [overflow-wrap:anywhere] mt-1 font-medium">
                   {renderHighlightedText(text)}
                 </div>
               )}
@@ -524,7 +548,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
 
           {/* Footer inside bubble: timestamp & edited label & status ticks / retry */}
-          <div className="flex items-center justify-end gap-1 text-[11px] text-[#8696A0] select-none float-right ml-3 pt-0.5">
+          <div className="flex items-center justify-end gap-1 text-[11px] text-[#8696A0] select-none float-right ml-3 pt-0.5 font-medium">
             {uploadFailed ? (
               <button
                 type="button"
@@ -543,18 +567,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <span className="tabular-nums">{timestamp}</span>
 
                 {isOutgoing && (
-                  <span className="flex items-center ml-0.5">
+                  <span className="relative w-3.5 h-3.5 ml-0.5 inline-block">
                     {message.isPending && (
-                      <Clock className="w-3 h-3 text-[#8696A0]" strokeWidth={1.75} />
+                      <Clock className="w-3.5 h-3.5 text-[#8696A0] absolute inset-0 animate-crossfade" strokeWidth={1.75} />
                     )}
                     {!message.isPending && status === 'sent' && (
-                      <Check className="w-3.5 h-3.5 text-[#8696A0]" strokeWidth={1.75} />
+                      <Check className="w-3.5 h-3.5 text-[#8696A0] absolute inset-0 animate-crossfade" strokeWidth={1.75} />
                     )}
                     {!message.isPending && status === 'delivered' && (
-                      <CheckCheck className="w-3.5 h-3.5 text-[#8696A0]" strokeWidth={1.75} />
+                      <CheckCheck className="w-3.5 h-3.5 text-[#8696A0] absolute inset-0 animate-crossfade" strokeWidth={1.75} />
                     )}
                     {!message.isPending && status === 'read' && (
-                      <CheckCheck className="w-3.5 h-3.5 text-[#00A884]" strokeWidth={2} />
+                      <CheckCheck className="w-3.5 h-3.5 text-[#20E39F] absolute inset-0 animate-crossfade" strokeWidth={2} />
                     )}
                   </span>
                 )}
@@ -582,7 +606,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {showMenu && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute left-0 bottom-full mb-1 z-30 bg-[#233138] rounded-[8px] border border-white/[0.08] shadow-xl py-1 w-36 select-none animate-fadeIn"
+                className="absolute left-0 bottom-full mb-1 z-30 bg-[#233138] rounded-[12px] border border-white/[0.08] shadow-xl py-1 w-36 select-none origin-bottom-left menu-popover-animate"
               >
                 {/* Reply */}
                 {onReply && (

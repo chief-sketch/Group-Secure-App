@@ -43,12 +43,12 @@ export const DirectoryDialog: React.FC<DirectoryDialogProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate"
     >
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[460px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left relative flex flex-col max-h-[85vh] outline-none"
+        className="w-full max-w-[460px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-left relative flex flex-col max-h-[85vh] outline-none modal-content-animate"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
@@ -88,7 +88,7 @@ export const DirectoryDialog: React.FC<DirectoryDialogProps> = ({
               placeholder="Search by name or department..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-[40px] pl-10 pr-3.5 rounded-[10px] bg-[#2A3942] border border-white/[0.08] text-[#E9EDEF] text-[13px] placeholder-[#8696A0] focus:outline-none focus:border-[#00A884] transition-standard"
+              className="w-full h-[44px] pl-10 pr-3.5 rounded-[10px] bg-[#2A3942] border border-white/[0.08] text-[#E9EDEF] text-base sm:text-[13px] placeholder-[#8696A0] focus:outline-none focus:border-[#00A884] transition-standard"
             />
           </div>
         </div>
@@ -121,7 +121,7 @@ export const DirectoryDialog: React.FC<DirectoryDialogProps> = ({
                     onSelectUser(colleague);
                     onClose();
                   }}
-                  className="w-full p-3 flex items-center justify-between text-left rounded-[10px] hover:bg-white/[0.04] transition-standard cursor-pointer group"
+                  className="w-full p-3 min-h-[52px] flex items-center justify-between text-left rounded-[12px] hover:bg-white/[0.04] chat-row transition-standard cursor-pointer group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar uid={colleague.uid} name={colleague.displayName} size={40} />

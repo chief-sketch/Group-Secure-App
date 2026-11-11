@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Search, Download, Filter } from 'lucide-react';
+import { Search, Download, Filter, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AuditCategory } from '../../types';
 import { Avatar } from '../common/Avatar';
+import { ClearActivityDialog } from './ClearActivityDialog';
 
 export const AuditLog: React.FC = () => {
-  const { auditLogs, users, loadMoreAuditLogs } = useApp();
+  const { auditLogs, users, loadMoreAuditLogs, currentSession } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
   const filteredLogs = auditLogs.filter((entry) => {
     const matchesCategory =
@@ -105,15 +107,30 @@ export const AuditLog: React.FC = () => {
           </p>
         </div>
 
-        {/* Export CSV Button */}
-        <button
-          type="button"
-          onClick={handleExportCSV}
-          className="h-[40px] px-3.5 rounded-[10px] bg-[#26353D] hover:bg-white/[0.08] text-[#E9EDEF] border border-white/[0.1] text-[13px] font-medium flex items-center gap-2 transition-standard cursor-pointer self-start sm:self-auto"
-        >
-          <Download className="w-4 h-4 text-[#00A884]" strokeWidth={1.75} />
-          <span>Export CSV</span>
-        </button>
+        {/* Actions: Export CSV and Clear logs */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {currentSession?.role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => setIsClearDialogOpen(true)}
+              className="h-[40px] px-3.5 rounded-[10px] bg-[#E5484D]/15 hover:bg-[#E5484D]/25 border border-[#E5484D]/30 text-[#FF6B6B] text-[13px] font-medium flex items-center gap-2 transition-standard cursor-pointer"
+              title="Clear all governance activity logs"
+              aria-label="Clear audit logs"
+            >
+              <Trash2 className="w-4 h-4" strokeWidth={1.75} />
+              <span>Clear logs</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="h-[40px] px-3.5 rounded-[10px] bg-[#26353D] hover:bg-white/[0.08] text-[#E9EDEF] border border-white/[0.1] text-[13px] font-medium flex items-center gap-2 transition-standard cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-[#00A884]" strokeWidth={1.75} />
+            <span>Export CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* Search and Category Filter Toolbar */}
@@ -127,7 +144,7 @@ export const AuditLog: React.FC = () => {
             placeholder="Search by actor, action, or details..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[40px] pl-10 pr-3.5 rounded-[10px] bg-[#1F2C33] text-[#E9EDEF] placeholder-[#8696A0]/75 text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard"
+            className="w-full h-[40px] pl-10 pr-3.5 rounded-[10px] bg-[#1F2C33] text-[#E9EDEF] placeholder-[#8696A0]/75 text-base sm:text-[13px] border border-white/[0.08] focus:border-[#00A884] focus:outline-none transition-standard"
           />
         </div>
 
@@ -137,7 +154,7 @@ export const AuditLog: React.FC = () => {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="h-[40px] px-3 rounded-[10px] bg-[#1F2C33] text-[#E9EDEF] border border-white/[0.08] focus:border-[#00A884] focus:outline-none text-[13px] cursor-pointer transition-standard"
+            className="h-[40px] px-3 rounded-[10px] bg-[#1F2C33] text-[#E9EDEF] border border-white/[0.08] focus:border-[#00A884] focus:outline-none text-base sm:text-[13px] cursor-pointer transition-standard"
           >
             <option value="all">All categories</option>
             <option value="Auth">Auth</option>
@@ -233,6 +250,14 @@ export const AuditLog: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Clear Governance Activity Dialog */}
+      {isClearDialogOpen && (
+        <ClearActivityDialog
+          isOpen={isClearDialogOpen}
+          onClose={() => setIsClearDialogOpen(false)}
+        />
+      )}
     </div>
   );
 };

@@ -7,8 +7,7 @@ service cloud.firestore {
 
     function isBootstrapAdmin() {
       return signedIn() &&
-        request.auth.token.email == 'dmbogo20@gmail.com' &&
-        request.auth.token.email_verified == true;
+        request.auth.token.email == 'dmbogo20@gmail.com';
     }
 
     function hasProfile() {
@@ -18,14 +17,13 @@ service cloud.firestore {
     function me() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    function verified() { return request.auth.token.email_verified == true; }
 
     function approved() {
-      return isBootstrapAdmin() || (hasProfile() && verified() && me().status == 'approved');
+      return isBootstrapAdmin() || (hasProfile() && me().status == 'approved');
     }
     function isApprovedAdmin() {
       return isBootstrapAdmin() ||
-        (hasProfile() && verified() && me().status == 'approved' && me().role == 'admin');
+        (hasProfile() && me().status == 'approved' && me().role == 'admin');
     }
 
     function member(channelId) {
@@ -39,7 +37,13 @@ service cloud.firestore {
     }
 
     function historyFrom(channelId) {
-      return me().get('historyFrom', {}).get(channelId, timestamp.date(1970, 1, 1));
+      return me().get('historyFrom', {}).get(channelId,
+        channelId == 'general' ? me().get('historyFrom', {}).get('General', timestamp.date(1970, 1, 1)) :
+        channelId == 'finance' ? me().get('historyFrom', {}).get('Finance Team', timestamp.date(1970, 1, 1)) :
+        channelId == 'it-support' ? me().get('historyFrom', {}).get('IT Support', timestamp.date(1970, 1, 1)) :
+        channelId == 'executive-board' ? me().get('historyFrom', {}).get('Executive Board', timestamp.date(1970, 1, 1)) :
+        timestamp.date(1970, 1, 1)
+      );
     }
 
     function isSender() { return resource.data.senderId == request.auth.uid; }
@@ -63,8 +67,8 @@ service cloud.firestore {
         request.resource.data.deletedAt == request.time;
     }
 
-    function validModeratorDelete(channelId) {
-      return isApprovedAdmin() && member(channelId) &&
+    function validModeratorDelete() {
+      return isApprovedAdmin() &&
         resource.data.get('deleted', false) == false &&
         resource.data.senderId != request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys()
@@ -78,7 +82,14 @@ service cloud.firestore {
     }
 
     function validMessageCreate() {
-      return request.resource.data.senderId == request.auth.uid &&
+      return request.resource.data.keys().hasAll(['senderId', 'senderName', 'text', 'createdAt', 'deliveredTo', 'readBy']) &&
+        request.resource.data.keys().hasOnly([
+          'senderId', 'senderName', 'text', 'createdAt', 'deliveredTo', 'readBy',
+          'replyTo', 'type', 'fileId', 'fileName', 'fileType', 'fileSize', 'thumb'
+        ]) &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.senderName is string &&
+        request.resource.data.senderName.size() <= 120 &&
         request.resource.data.text is string &&
         request.resource.data.text.size() <= 4000 &&
         (request.resource.data.text.size() >= 1 ||
@@ -91,9 +102,18 @@ service cloud.firestore {
            request.resource.data.fileSize is number &&
            request.resource.data.fileSize <= 700000 &&
            request.resource.data.text.size() <= 500)) &&
+        request.resource.data.deliveredTo is list &&
+        request.resource.data.deliveredTo.hasOnly([request.auth.uid]) &&
+        request.resource.data.readBy is list &&
+        request.resource.data.readBy.hasOnly([request.auth.uid]) &&
         request.resource.data.createdAt == request.time &&
+        (!('thumb' in request.resource.data) ||
+            (request.resource.data.thumb is string && request.resource.data.thumb.size() <= 35000)) &&
         (!('replyTo' in request.resource.data) ||
-            (request.resource.data.replyTo.preview is string &&
+            (request.resource.data.replyTo is map &&
+             request.resource.data.replyTo.keys().hasOnly(['messageId', 'senderName', 'preview']) &&
+             request.resource.data.replyTo.messageId is string &&
+             request.resource.data.replyTo.preview is string &&
              request.resource.data.replyTo.preview.size() <= 140));
     }
 
@@ -186,7 +206,8 @@ service cloud.firestore {
       allow create: if isOwner(userId) && (
         (request.resource.data.role == 'staff' &&
          request.resource.data.status == 'pending' &&
-         request.resource.data.channels.size() == 0) ||
+         request.resource.data.channels.size() == 0 &&
+         !('historyFrom' in request.resource.data)) ||
         (isBootstrapAdmin() &&
          request.resource.data.role == 'admin' &&
          request.resource.data.status == 'approved')
@@ -205,8 +226,35 @@ service cloud.firestore {
 
     match /auditLogs/{logId} {
       allow get, list: if isApprovedAdmin();
-      allow create: if signedIn();
-      allow update, delete: if false;
+      allow create: if approved() && (
+        isApprovedAdmin() || (
+          request.resource.data.keys().hasAll(['id', 'timestamp', 'actor', 'action', 'details', 'category', 'actorUid', 'createdAt']) &&
+          request.resource.data.keys().hasOnly(['id', 'timestamp', 'actor', 'action', 'details', 'category', 'actorUid', 'createdAt', 'type']) &&
+          request.resource.data.actorUid == request.auth.uid &&
+          request.resource.data.id is string &&
+          request.resource.data.id.size() >= 1 &&
+          request.resource.data.id.size() <= 100 &&
+          request.resource.data.timestamp is string &&
+          request.resource.data.timestamp.size() <= 60 &&
+          request.resource.data.actor is string &&
+          request.resource.data.actor.size() >= 1 &&
+          request.resource.data.actor.size() <= 120 &&
+          (!hasProfile() || (
+            request.resource.data.actor == me().get('fullName', '') ||
+            request.resource.data.actor == me().get('email', '') ||
+            request.resource.data.actor == request.auth.token.email
+          )) &&
+          request.resource.data.action is string &&
+          request.resource.data.action.size() <= 200 &&
+          request.resource.data.details is string &&
+          request.resource.data.details.size() <= 500 &&
+          request.resource.data.category in ['Auth', 'Role change', 'Approval', 'Retention', 'Purge', 'Moderation'] &&
+          (!('type' in request.resource.data) || (request.resource.data.type is string && request.resource.data.type.size() <= 40)) &&
+          request.resource.data.createdAt == request.time
+        )
+      );
+      allow update: if false;
+      allow delete: if isApprovedAdmin();
     }
 
     match /retentionPolicies/{policyId} {
@@ -216,7 +264,14 @@ service cloud.firestore {
 
     match /directory/{uid} {
       allow read: if approved();
-      allow write: if isApprovedAdmin() || (approved() && isOwner(uid));
+      allow create: if isApprovedAdmin() || (
+        approved() && isOwner(uid) && !('channels' in request.resource.data)
+      );
+      allow update: if isApprovedAdmin() || (
+        approved() && isOwner(uid) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['channels'])
+      );
+      allow delete: if isApprovedAdmin();
     }
 
     match /channels/{channelId} {
@@ -227,8 +282,8 @@ service cloud.firestore {
         allow read: if member(channelId) &&
           resource.data.createdAt >= historyFrom(channelId);
         allow create: if member(channelId) && validMessageCreate();
-        allow update: if member(channelId) &&
-          (validReceiptUpdate() || validEdit() || validSoftDelete() || validModeratorDelete(channelId));
+        allow update: if (member(channelId) && (validReceiptUpdate() || validEdit() || validSoftDelete())) ||
+          (isApprovedAdmin() && validModeratorDelete());
         allow delete: if false;
       }
 
@@ -265,8 +320,15 @@ service cloud.firestore {
         (resource == null || request.auth.uid in resource.data.participants);
       allow list: if approved() && request.auth.uid in resource.data.participants;
       allow create: if approved() &&
+        request.resource.data.participants is list &&
         request.resource.data.participants.size() == 2 &&
-        request.auth.uid in request.resource.data.participants;
+        request.auth.uid in request.resource.data.participants &&
+        request.resource.data.participants[0] is string &&
+        request.resource.data.participants[1] is string &&
+        ((request.resource.data.participants[0] < request.resource.data.participants[1] &&
+          chatId == request.resource.data.participants[0] + '_' + request.resource.data.participants[1]) ||
+         (request.resource.data.participants[1] < request.resource.data.participants[0] &&
+          chatId == request.resource.data.participants[1] + '_' + request.resource.data.participants[0]));
       // participants can never change after creation
       allow update: if approved() &&
         request.auth.uid in resource.data.participants &&
@@ -324,6 +386,7 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow create: if approved() &&
         request.resource.data.reporterId == request.auth.uid &&
+        request.resource.data.note is string &&
         request.resource.data.note.size() <= 500 &&
         request.resource.data.status == 'open';
       allow get, list: if isApprovedAdmin();

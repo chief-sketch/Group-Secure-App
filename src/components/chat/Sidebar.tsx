@@ -1,5 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, MoreVertical, LogOut, Shield, Bell, BellOff, MessageSquarePlus, User, Flag, KeyRound, Sun, Moon, Calendar } from 'lucide-react';
+import {
+  Search,
+  MoreVertical,
+  LogOut,
+  Shield,
+  Bell,
+  BellOff,
+  MessageSquarePlus,
+  User,
+  Flag,
+  KeyRound,
+  Sun,
+  Moon,
+  Calendar,
+} from 'lucide-react';
 import { ChatConversation, UserSession, DirectoryUser } from '../../types';
 import { ChatList } from './ChatList';
 import { useApp } from '../../context/AppContext';
@@ -47,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     toggleTheme,
     myMeetings,
     setIsMyMeetingsPageOpen,
+    setScreen,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,6 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     user.providerId === 'password' ||
     auth.currentUser?.providerData.some((p) => p.providerId === 'password')
   );
+
+  const isAdmin = user.role === 'admin';
 
   // Close menu on outside click
   useEffect(() => {
@@ -97,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     : [];
 
   return (
-    <div className="w-full md:w-[360px] h-full bg-[#111B21] border-r border-white/[0.06] flex flex-col flex-shrink-0 select-none">
+    <div className="w-full md:w-[320px] lg:w-[360px] h-full bg-[#0D191F] border-r border-white/[0.06] flex flex-col flex-shrink-0 select-none">
       {/* Profile Dialog */}
       <ProfileDialog
         isOpen={isProfileOpen}
@@ -105,56 +122,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
         returnFocusRef={menuButtonRef}
       />
 
-      {/* Sidebar Header */}
-      <div className="h-[60px] bg-[#1F2C33] px-3.5 flex items-center justify-between flex-shrink-0 border-b border-white/[0.06]">
+      {/* Sidebar Header: 64px matching mockup */}
+      <div className="h-[64px] bg-[#0F1D24] px-4 flex items-center justify-between flex-shrink-0 border-b border-white/[0.06]">
         {/* User avatar & info */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Avatar uid={user.uid} name={user.fullName} size={40} />
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar uid={user.uid} name={user.fullName} size={38} />
           <div className="min-w-0">
-            <h1 className="text-[14px] font-semibold text-[#E9EDEF] truncate leading-tight">
+            <h1 className="text-[13.5px] font-semibold text-white truncate leading-tight">
               {user.fullName}
             </h1>
-            <p className="text-[11px] text-[#8696A0] truncate flex items-center gap-1">
-              <Shield className="w-3 h-3 text-[#00A884]" strokeWidth={1.75} />
-              <span className="uppercase tracking-wider label-tracking">{user.role}</span>
+            <p className="text-[11px] font-bold text-[#20E39F] truncate tracking-wide mt-0.5">
+              {user.role?.toUpperCase() || 'STAFF'}
             </p>
           </div>
         </div>
 
-        {/* Right side controls: Notification Bell toggle, Meetings button & Menu */}
-        <div className="flex items-center gap-1">
+        {/* Right side controls: Admin badge button, Notification Bell toggle, Meetings & Menu */}
+        <div className="flex items-center gap-1.5">
+          {/* Admin Pill Button (shown for admins) */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setScreen('admin_dashboard')}
+              className="px-2.5 py-1 rounded-full border border-[#20E39F]/40 text-[#20E39F] text-[12px] font-semibold flex items-center gap-1 hover:bg-[#20E39F]/10 transition-colors cursor-pointer"
+              title="Admin Dashboard"
+            >
+              <Shield className="w-3.5 h-3.5 text-[#20E39F]" strokeWidth={2} />
+              <span>Admin</span>
+            </button>
+          )}
+
           {/* Notification Mute/Unmute Toggle */}
           <button
             type="button"
             onClick={toggleNotifications}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+            className={`w-9 h-9 rounded-[12px] flex items-center justify-center transition-colors cursor-pointer ${
               notificationsEnabled
-                ? 'text-[#00A884] hover:bg-white/[0.08]'
-                : 'text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.05]'
+                ? 'text-[#20E39F] hover:bg-white/[0.06]'
+                : 'text-[#8696A0] hover:text-white hover:bg-white/[0.04]'
             }`}
             title={notificationsEnabled ? 'Notification toasts enabled (click to mute)' : 'Notification toasts muted (click to unmute)'}
             aria-label="Toggle notifications"
           >
             {notificationsEnabled ? (
-              <Bell className="w-4 h-4" />
+              <Bell className="w-4 h-4 text-[#20E39F]" />
             ) : (
               <BellOff className="w-4 h-4" />
-            )}
-          </button>
-
-          {/* Meetings Calendar Button */}
-          <button
-            type="button"
-            onClick={() => setIsMyMeetingsPageOpen(true)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.05] transition-colors cursor-pointer relative"
-            title="Meetings"
-            aria-label="Meetings"
-          >
-            <Calendar className="w-4 h-4" />
-            {myMeetings.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[#00A884] text-white text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
-                {myMeetings.length}
-              </span>
             )}
           </button>
 
@@ -164,49 +177,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ref={menuButtonRef}
               type="button"
               onClick={() => setShowMenu(!showMenu)}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.05] transition-colors duration-150 cursor-pointer"
+              className="w-9 h-9 rounded-[12px] flex items-center justify-center text-[#8696A0] hover:text-white hover:bg-white/[0.04] transition-colors cursor-pointer"
               aria-label="User Menu"
+              title="User menu"
             >
-              <MoreVertical className="w-5 h-5" />
+              <MoreVertical className="w-4 h-4" />
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 top-11 w-44 bg-[#233138] rounded-[8px] border border-white/[0.08] shadow-xl py-1.5 z-50 animate-fadeIn">
+              <div className="absolute right-0 top-11 w-48 bg-[#18262E] rounded-[12px] border border-white/[0.08] shadow-2xl py-1.5 z-50 origin-top-right menu-popover-animate text-[13px]">
                 <button
                   type="button"
                   onClick={() => {
                     setShowMenu(false);
                     setIsMyMeetingsPageOpen(true);
                   }}
-                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-left text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <Calendar className="w-4 h-4 text-[#8696A0]" />
                   <span className="flex-1">Meetings</span>
                   {myMeetings.length > 0 && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#00A884] text-white text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#20E39F] text-[#0A1A14] text-[10px] font-bold flex items-center justify-center tabular-nums">
                       {myMeetings.length}
                     </span>
                   )}
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setShowMenu(false);
                     openProfileDialog();
                   }}
-                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-left text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <User className="w-4 h-4 text-[#8696A0]" />
                   <span>Edit profile</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     toggleTheme();
                     setShowMenu(false);
                   }}
-                  aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer min-h-[44px]"
+                  className="w-full px-3.5 py-2.5 text-left text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   {theme === 'dark' ? (
                     <Sun className="w-4 h-4 text-[#8696A0]" />
@@ -215,28 +230,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                   <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setShowMenu(false);
                     openPrivacyModal();
                   }}
-                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-left text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <Shield className="w-4 h-4 text-[#8696A0]" />
                   <span>Privacy notice</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setShowMenu(false);
                     openReportModal({ type: 'app' });
                   }}
-                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-left text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <Flag className="w-4 h-4 text-[#8696A0]" />
                   <span>Report a problem</span>
                 </button>
+
                 {isPasswordUser && (
                   <button
                     type="button"
@@ -244,26 +262,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       setShowMenu(false);
                       setIsChangePasswordOpen(true);
                     }}
-                    className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer"
+                    className="w-full px-3.5 py-2.5 text-left text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                   >
                     <KeyRound className="w-4 h-4 text-[#8696A0]" />
                     <span>Change password</span>
                   </button>
                 )}
+
                 <div className="my-1 border-t border-white/[0.06]" />
+
                 <button
                   type="button"
                   onClick={() => {
                     setShowMenu(false);
                     onLogout();
                   }}
-                  className="w-full px-3.5 py-2.5 text-left text-[13px] text-[#E9EDEF] hover:bg-[#182229] flex items-center gap-2.5 transition-colors duration-150 cursor-pointer"
+                  className="w-full px-3.5 py-2.5 text-left text-[#E9EDEF] hover:bg-[#1E303A] flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 text-[#8696A0]" />
                   <span>Log out</span>
                 </button>
-                <div className="px-3.5 py-2 text-[11px] text-[#8696A0]/70 select-none border-t border-white/[0.06] mt-0.5">
-                  Session expires after {STAFF_IDLE_MINUTES} minutes of inactivity.
+
+                <div className="px-3.5 py-1.5 text-[11px] text-[#8696A0]/60 select-none border-t border-white/[0.06] mt-0.5">
+                  Expires after {STAFF_IDLE_MINUTES}m idle
                 </div>
               </div>
             )}
@@ -271,99 +292,72 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="p-3 bg-[#111B21] border-b border-white/[0.04]">
+      {/* Search Bar matching mockup: "Search channels or people" */}
+      <div className="p-3 bg-[#0D191F]">
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8696A0]">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6B7D87]">
             <Search className="w-4 h-4" />
           </div>
           <input
             type="text"
-            placeholder="Search channels or direct chats"
+            placeholder="Search channels or people"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-[38px] pl-9 pr-3 rounded-[8px] bg-[#202C33] text-[#E9EDEF] placeholder-[#8696A0] text-[13px] border border-transparent focus:border-[#00A884] focus:outline-none transition-colors duration-150"
+            className="w-full h-[40px] pl-10 pr-3 rounded-[12px] bg-[#16252C] text-[#E9EDEF] placeholder-[#6B7D87] text-[13.5px] border border-white/[0.06] focus:border-[#20E39F] focus:outline-none transition-standard"
           />
         </div>
       </div>
 
-      {/* Tabs (Channels and Direct) */}
-      {(() => {
-        const channelUnreadTotal = chats
-          .filter((c) => c.type === 'channel' && c.hasAccess)
-          .reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-        const directUnreadTotal = chats
-          .filter((c) => c.type === 'direct')
-          .reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-        const allUnreadTotal = channelUnreadTotal + directUnreadTotal;
+      {/* Tabs matching mockup: All / Channels / Direct pills */}
+      <div className="flex items-center justify-between px-3.5 pb-2.5 pt-0.5 bg-[#0D191F] border-b border-white/[0.04]">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('all')}
+            className={`px-3.5 py-1 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ${
+              activeTab === 'all'
+                ? 'bg-[#13382F] text-[#20E39F] border border-[#20E39F]/30'
+                : 'text-[#8696A0] hover:text-white'
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('channels')}
+            className={`px-3.5 py-1 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ${
+              activeTab === 'channels'
+                ? 'bg-[#13382F] text-[#20E39F] border border-[#20E39F]/30'
+                : 'text-[#8696A0] hover:text-white'
+            }`}
+          >
+            Channels
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('direct')}
+            className={`px-3.5 py-1 rounded-full text-[12.5px] font-semibold transition-colors cursor-pointer ${
+              activeTab === 'direct'
+                ? 'bg-[#13382F] text-[#20E39F] border border-[#20E39F]/30'
+                : 'text-[#8696A0] hover:text-white'
+            }`}
+          >
+            Direct
+          </button>
+        </div>
 
-        return (
-          <div className="flex items-center justify-between px-3 pt-2 pb-1.5 border-b border-white/[0.04] bg-[#111B21]">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('all')}
-                className={`px-3 py-1 rounded-[6px] text-[12px] font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'all'
-                    ? 'bg-[#202C33] text-[#00A884]'
-                    : 'text-[#8696A0] hover:text-[#E9EDEF]'
-                }`}
-              >
-                <span>All</span>
-                {allUnreadTotal > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#00A884] text-white text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
-                    {allUnreadTotal > 99 ? '99+' : allUnreadTotal}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('channels')}
-                className={`px-3 py-1 rounded-[6px] text-[12px] font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'channels'
-                    ? 'bg-[#202C33] text-[#00A884]'
-                    : 'text-[#8696A0] hover:text-[#E9EDEF]'
-                }`}
-              >
-                <span>Channels</span>
-                {channelUnreadTotal > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#00A884] text-white text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
-                    {channelUnreadTotal > 99 ? '99+' : channelUnreadTotal}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('direct')}
-                className={`px-3 py-1 rounded-[6px] text-[12px] font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'direct'
-                    ? 'bg-[#202C33] text-[#00A884]'
-                    : 'text-[#8696A0] hover:text-[#E9EDEF]'
-                }`}
-              >
-                <span>Direct</span>
-                {directUnreadTotal > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#00A884] text-white text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
-                    {directUnreadTotal > 99 ? '99+' : directUnreadTotal}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {activeTab === 'direct' && onOpenDirectory && (
-              <button
-                type="button"
-                onClick={onOpenDirectory}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[12px] font-medium text-[#00A884] hover:bg-[#00A884]/15 transition-standard cursor-pointer border border-[#00A884]/30"
-                title="Start new conversation from staff directory"
-              >
-                <MessageSquarePlus className="w-3.5 h-3.5" />
-                <span>New message</span>
-              </button>
-            )}
-          </div>
-        );
-      })()}
+        {activeTab === 'direct' && onOpenDirectory && (
+          <button
+            type="button"
+            onClick={onOpenDirectory}
+            className="flex items-center gap-1 text-[12px] font-semibold text-[#20E39F] hover:bg-[#20E39F]/10 px-2 py-1 rounded-full border border-[#20E39F]/30 transition-standard cursor-pointer"
+            title="Start new conversation"
+          >
+            <MessageSquarePlus className="w-3.5 h-3.5" />
+            <span>New</span>
+          </button>
+        )}
+      </div>
 
       {/* Chat List */}
       <ChatList
@@ -378,6 +372,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           setSearchQuery('');
           onSelectPerson?.(person);
         }}
+        activeTab={activeTab}
       />
 
       {/* Change Password Dialog for email/password users */}

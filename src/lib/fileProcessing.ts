@@ -291,19 +291,26 @@ export async function processDocumentFile(file: File): Promise<ProcessedFile> {
  * Never renders documents inside page, never opens file data as a page
  */
 export function downloadFileFromBase64(fileName: string, fileType: string, base64Data: string) {
-  const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
-  const byteCharacters = atob(cleanBase64);
-  const byteNumbers = new Uint8Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  try {
+    let cleanBase64 = (base64Data || '').replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+    while (cleanBase64.length % 4 !== 0) {
+      cleanBase64 += '=';
+    }
+    const byteCharacters = atob(cleanBase64);
+    const byteNumbers = new Uint8Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const blob = new Blob([byteNumbers], { type: fileType || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || 'download';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (err) {
+    console.error('Failed to download base64 file:', err);
   }
-  const blob = new Blob([byteNumbers], { type: fileType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }

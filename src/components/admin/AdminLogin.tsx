@@ -90,9 +90,7 @@ export const AdminLogin: React.FC = () => {
       department: adminUser.department,
       role: 'admin',
       status: 'approved',
-      keyFingerprint: 'SEC-DEVICE-ADM-01',
-      deviceId: 'SEC-DEVICE-ADM-01',
-      algorithm: 'TLS 1.3 + HTTPS Strict Transport',
+      algorithm: 'TLS in transit, encrypted at rest',
       channels: adminUser.channels || ['General', 'Finance Team', 'IT Support', 'Executive Board'],
     });
 
@@ -142,7 +140,7 @@ export const AdminLogin: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B141A] text-[#E9EDEF] flex flex-col items-center justify-center p-4 antialiased">
+    <div className="min-h-screen min-h-[100dvh] bg-[#0B141A] text-[#E9EDEF] flex flex-col items-center justify-center p-4 antialiased pt-safe pb-safe">
       {/* Centered Restrained Card: solid #1F2C33, 12px radius, 1px border rgba(255,255,255,0.08) */}
       <div className="w-full max-w-[420px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] p-8 flex flex-col">
         {/* Top Icon & Title */}

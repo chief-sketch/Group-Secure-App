@@ -34,10 +34,13 @@ import {
   updateUserAvatarInDirectory,
   adminRemoveUserAvatarPhoto,
   updateUserStatusInFirestore,
+  deleteUserAccountFromFirestore,
   acceptPrivacyNoticeInFirestore,
   subscribeToReports,
   subscribeToChannels,
   updateChannelInFirestore,
+  clearChannelHistory,
+  deleteAuditLogsInFirestore,
   Timestamp,
   updateUserChannelHistoryFrom,
   subscribeToAllHistoryRequests,
@@ -113,6 +116,7 @@ interface AppContextType {
   reconsiderUser: (userId: string) => Promise<void>;
   suspendUser: (userId: string) => Promise<void>;
   reactivateUser: (userId: string) => Promise<void>;
+  deleteUserAccount: (userId: string) => Promise<void>;
   updateUserRoleAndChannels: (
     userId: string,
     role: UserRole,
@@ -191,6 +195,8 @@ interface AppContextType {
       description: string;
     }
   ) => Promise<void>;
+  clearChannelHistoryAction: (channelId: string, reason?: string) => Promise<void>;
+  clearGovernanceActivity: () => Promise<void>;
   clearAppCaches: () => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
@@ -457,12 +463,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let isSubscribed = true;
 
-    // Safety fallback timer: ensure authLoading is never stuck indefinitely
+    // Fast safety fallback timer: ensure authLoading never delays initial interactive paint
     const authSafetyTimer = setTimeout(() => {
       if (isSubscribed) {
         setAuthLoading(false);
       }
-    }, 1500);
+    }, 250);
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       clearTimeout(authSafetyTimer);
@@ -473,7 +479,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (prev === 'admin_dashboard' || prev === 'admin_signup') {
             return 'admin_login';
           }
-          if (prev === 'chat' || prev === 'verifying_keys' || prev === 'verify_email') {
+          if (prev === 'chat' || prev === 'verifying_keys') {
             return 'login';
           }
           return prev;
@@ -572,16 +578,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             role: profile.role,
             status: profile.status,
             privacyAcceptedAt: profile.privacyAcceptedAt,
-            keyFingerprint:
-              profile.role === 'admin'
-                ? 'SEC-DEVICE-ADM-01'
-                : 'ECC-256: 4F:9A:82:1C:7E:33:B8:2D',
-            deviceId:
-              profile.role === 'admin' ? 'SEC-DEVICE-ADM-01' : 'SEC-DEVICE-STF-99',
-            algorithm:
-              profile.role === 'admin'
-                ? 'TLS 1.3 + HTTPS Strict Transport'
-                : 'TLS 1.3 Standard Transport',
+            algorithm: 'TLS in transit, encrypted at rest',
             channels:
               profile.channels && profile.channels.length > 0
                 ? profile.channels
@@ -593,24 +590,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           setCurrentSession(sessionObj);
 
-          if (isPasswordProvider && !isEmailVerified) {
-            setScreenState('verify_email');
-          } else if (profile.status === 'approved') {
-            // Guard: Never show admin screens from a fallback unless the profile came from
-            // Firestore's cache AND the user was already an approved admin earlier in the same browser tab session.
+          if (profile.status === 'approved') {
             if (profile.role === 'admin') {
-              const canAccessAdmin =
-                !profileResult.fromCache || wasSessionApprovedAdmin(firebaseUser.uid);
-              if (canAccessAdmin) {
-                syncUserToDirectory(firebaseUser.uid, profile.fullName, profile.department);
-                setScreenState((prev) => (prev === 'admin_login' ? 'admin_dashboard' : prev));
-              } else {
-                // Not previously verified admin in this session: treat as staff chat or prompt login
-                setScreenState('login');
-              }
+              recordSessionApprovedAdmin(firebaseUser.uid);
+              syncUserToDirectory(firebaseUser.uid, profile.fullName, profile.department);
+              setScreenState((prev) => {
+                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+                  return 'admin_dashboard';
+                }
+                return prev === 'login' || prev === 'signup' || prev === 'admin_login' ? 'admin_dashboard' : prev;
+              });
             } else {
               setScreenState((prev) =>
-                prev === 'login' || prev === 'signup' || prev === 'verify_email' ? 'chat' : prev
+                prev === 'login' || prev === 'signup' ? 'chat' : prev
               );
             }
           }
@@ -660,16 +652,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             role: effectiveRole,
             status: cachedProfile.status,
             privacyAcceptedAt: cachedProfile.privacyAcceptedAt,
-            keyFingerprint:
-              effectiveRole === 'admin'
-                ? 'SEC-DEVICE-ADM-01'
-                : 'ECC-256: 4F:9A:82:1C:7E:33:B8:2D',
-            deviceId:
-              effectiveRole === 'admin' ? 'SEC-DEVICE-ADM-01' : 'SEC-DEVICE-STF-99',
-            algorithm:
-              effectiveRole === 'admin'
-                ? 'TLS 1.3 + HTTPS Strict Transport'
-                : 'TLS 1.3 Standard Transport',
+            algorithm: 'TLS in transit, encrypted at rest',
             channels:
               cachedProfile.channels && cachedProfile.channels.length > 0
                 ? cachedProfile.channels
@@ -683,9 +666,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentSession(sessionObj);
           if (cachedProfile.status === 'approved') {
             if (isAllowedAdmin) {
-              setScreenState((prev) => (prev === 'admin_login' ? 'admin_dashboard' : prev));
+              setScreenState((prev) => {
+                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+                  return 'admin_dashboard';
+                }
+                return prev === 'login' || prev === 'signup' || prev === 'admin_login' ? 'admin_dashboard' : prev;
+              });
             } else {
-              setScreenState((prev) => (prev === 'login' || prev === 'signup' || prev === 'verify_email' ? 'chat' : prev));
+              setScreenState((prev) => (prev === 'login' || prev === 'signup' ? 'chat' : prev));
             }
           }
         } else {
@@ -773,16 +761,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: profile.role,
           status: profile.status,
           privacyAcceptedAt: profile.privacyAcceptedAt,
-          keyFingerprint:
-            profile.role === 'admin'
-              ? 'SEC-DEVICE-ADM-01'
-              : 'ECC-256: 4F:9A:82:1C:7E:33:B8:2D',
-          deviceId:
-            profile.role === 'admin' ? 'SEC-DEVICE-ADM-01' : 'SEC-DEVICE-STF-99',
-          algorithm:
-            profile.role === 'admin'
-              ? 'TLS 1.3 + HTTPS Strict Transport'
-              : 'TLS 1.3 Standard Transport',
+          algorithm: 'TLS in transit, encrypted at rest',
           channels:
             profile.channels && profile.channels.length > 0
               ? profile.channels
@@ -792,19 +771,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           emailVerified: user.emailVerified,
         };
         setCurrentSession(sessionObj);
-        if (isPasswordProvider && !user.emailVerified) {
-          setScreenState('verify_email');
-        } else if (profile.status === 'approved') {
+        if (profile.status === 'approved') {
           if (profile.role === 'admin') {
-            const canAccessAdmin = !profRes.fromCache || wasSessionApprovedAdmin(user.uid);
-            if (canAccessAdmin) {
-              syncUserToDirectory(user.uid, profile.fullName, profile.department);
-              setScreenState((prev) => (prev === 'admin_login' ? 'admin_dashboard' : prev));
-            } else {
-              setScreenState('login');
-            }
+            recordSessionApprovedAdmin(user.uid);
+            syncUserToDirectory(user.uid, profile.fullName, profile.department);
+            setScreenState((prev) => {
+              if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+                return 'admin_dashboard';
+              }
+              return prev === 'login' || prev === 'signup' || prev === 'admin_login' ? 'admin_dashboard' : prev;
+            });
           } else {
-            setScreenState((prev) => (prev === 'login' || prev === 'signup' || prev === 'verify_email' ? 'chat' : prev));
+            setScreenState((prev) => (prev === 'login' || prev === 'signup' ? 'chat' : prev));
           }
         }
       } else {
@@ -1200,6 +1178,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const clearChannelHistoryAction = async (channelId: string, reason?: string) => {
+    if (!currentSession?.uid || currentSession.role !== 'admin' || currentSession.status !== 'approved') {
+      showToast('Only approved administrators can clear channel history');
+      return;
+    }
+    const norm = normalizeChannelId(channelId);
+    const channelName = getChannelDisplayName(channelId);
+    const chosenReason = reason || 'Routine channel cleanup';
+    const adminName = currentSession.fullName || currentSession.email || 'Administrator';
+
+    try {
+      await clearChannelHistory(norm, currentSession.uid, adminName, chosenReason);
+      showToast(`Channel history cleared for ${displayChannelName(channelName)}`);
+    } catch (err: any) {
+      console.error('Failed to clear channel history:', err);
+      showToast('Failed to clear channel history');
+      throw err;
+    }
+  };
+
+  const clearGovernanceActivity = async () => {
+    if (!currentSession?.uid || currentSession.role !== 'admin' || currentSession.status !== 'approved') {
+      showToast('Only approved administrators can clear governance activity');
+      return;
+    }
+    const adminName = currentSession.fullName || currentSession.email || 'Administrator';
+    try {
+      await deleteAuditLogsInFirestore(currentSession.uid, adminName);
+      setAuditLogs([]);
+      showToast('Governance activity cleared');
+    } catch (err: any) {
+      console.error('Failed to clear governance activity:', err);
+      showToast('Failed to clear governance activity');
+      throw err;
+    }
+  };
+
   const getDirectoryUser = (uid?: string): DirectoryUser | undefined => {
     if (!uid) return undefined;
     return directoryMap[uid];
@@ -1324,6 +1339,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       action,
       details,
       category,
+      actorUid: currentSession?.uid || auth.currentUser?.uid || undefined,
     };
     setAuditLogs((prev) => [newEntry, ...prev]);
     try {
@@ -1403,7 +1419,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     assignedChannels.forEach((ch) => {
       const normId = normalizeChannelId(ch);
       const opt = historyFromOptions?.[ch] || historyFromOptions?.[normId] || 'now';
-      historyFromMap[normId] = opt === 'full' ? Timestamp.fromMillis(0) : nowTs;
+      const ts = opt === 'full' ? Timestamp.fromMillis(0) : nowTs;
+      historyFromMap[normId] = ts;
+      if (ch !== normId) {
+        historyFromMap[ch] = ts;
+      }
     });
 
     try {
@@ -1514,6 +1534,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const deleteUserAccount = async (userId: string) => {
+    const targetUser = users.find((u) => u.id === userId);
+    if (!targetUser) return;
+    if (userId === currentSession?.uid) {
+      showToast('You cannot delete your own account');
+      return;
+    }
+    if (targetUser.email.toLowerCase() === 'dmbogo20@gmail.com') {
+      showToast('Root administrator account cannot be deleted');
+      return;
+    }
+    if (targetUser.role === 'admin') {
+      const approvedAdmins = users.filter((u) => u.role === 'admin' && u.status === 'approved');
+      if (approvedAdmins.length <= 1) {
+        showToast('Cannot delete the last remaining administrator');
+        return;
+      }
+    }
+
+    try {
+      await deleteUserAccountFromFirestore(userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setDirectoryUsers((prev) => prev.filter((u) => u.uid !== userId));
+      setDirectoryMap((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      await addAuditEntry(
+        currentSession?.email || 'admin',
+        'Account deleted',
+        `Account for ${targetUser.fullName} (${targetUser.email}) permanently deleted by ${currentSession?.email || 'admin'}`,
+        'Role change'
+      );
+      showToast(`Account for ${targetUser.fullName} has been deleted`);
+    } catch (err) {
+      console.error('Failed to delete user account:', err);
+      showToast('Failed to delete user account');
+      throw err;
+    }
+  };
+
   const acceptPrivacyNotice = async () => {
     if (!currentSession?.uid) return;
     try {
@@ -1543,7 +1605,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const isNewlyAdded = !prevChannels.some((pc) => normalizeChannelId(pc) === normId);
       if (isNewlyAdded || historyFromUpdates?.[ch] || historyFromUpdates?.[normId]) {
         const opt = historyFromUpdates?.[ch] || historyFromUpdates?.[normId] || 'now';
-        historyUpdates[normId] = opt === 'full' ? Timestamp.fromMillis(0) : nowTs;
+        const ts = opt === 'full' ? Timestamp.fromMillis(0) : nowTs;
+        historyUpdates[normId] = ts;
+        if (ch !== normId) {
+          historyUpdates[ch] = ts;
+        }
       }
     });
 
@@ -1689,6 +1755,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reconsiderUser,
         suspendUser,
         reactivateUser,
+        deleteUserAccount,
         updateUserRoleAndChannels,
         changeUserChannelHistoryAccess,
         historyRequests,
@@ -1728,6 +1795,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         channelsLoading,
         getChannelDoc,
         updateChannelData,
+        clearChannelHistoryAction,
+        clearGovernanceActivity,
         clearAppCaches,
         theme,
         toggleTheme,

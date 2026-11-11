@@ -1,7 +1,6 @@
 export type AuthScreen =
   | 'login'
   | 'signup'
-  | 'verify_email'
   | 'verifying_keys'
   | 'chat'
   | 'admin_login'
@@ -20,8 +19,6 @@ export interface UserSession {
   department: string;
   role: UserRole;
   status: AccountStatus;
-  keyFingerprint: string;
-  deviceId: string;
   algorithm: string;
   channels?: string[];
   historyFrom?: Record<string, any>;
@@ -48,6 +45,10 @@ export interface ChannelDoc {
   avatarIcon?: string;
   avatarColor?: string;
   avatarPhoto?: string;
+  clearedAt?: any;
+  clearedBy?: string;
+  clearedByName?: string;
+  clearedReason?: string;
   createdAt?: any;
   updatedAt?: any;
 }
@@ -228,6 +229,10 @@ export interface ChatConversation {
   lastMessage?: string;
   lastMessageTime?: string;
   lastMessageCreatedAt?: any;
+  clearedAt?: any;
+  clearedBy?: string;
+  clearedByName?: string;
+  clearedReason?: string;
   messages: ChatMessage[];
   isTyping?: boolean;
 }

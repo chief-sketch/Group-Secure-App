@@ -46,7 +46,7 @@ export const SessionTimeoutModal: React.FC<SessionTimeoutModalProps> = ({
       aria-modal="true"
       aria-labelledby="session-timeout-title"
       aria-describedby="session-timeout-desc"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 transition-standard"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 modal-scrim-animate"
     >
       {/* Screen reader live region for 10-second interval announcements */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
@@ -56,7 +56,7 @@ export const SessionTimeoutModal: React.FC<SessionTimeoutModalProps> = ({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[380px] bg-[#1F2C33] rounded-[12px] border border-white/[0.08] shadow-xl p-6 text-center select-none outline-none"
+        className="w-full max-w-[380px] bg-[#1F2C33] rounded-[16px] border border-white/[0.08] shadow-2xl p-6 text-center select-none outline-none modal-content-animate"
       >
         {/* Clock icon in matching circular badge */}
         <div className="w-11 h-11 rounded-full bg-[#00A884]/15 border border-[#00A884]/30 text-[#00A884] flex items-center justify-center mx-auto mb-4">
@@ -93,7 +93,7 @@ export const SessionTimeoutModal: React.FC<SessionTimeoutModalProps> = ({
               ref={primaryButtonRef}
               type="button"
               onClick={onStaySignedIn}
-              className="w-full h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008f72] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center shadow-sm"
+              className="w-full h-[44px] rounded-[12px] bg-[#00A884] hover:bg-[#008f72] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center shadow-sm"
             >
               Stay signed in
             </button>
@@ -101,7 +101,7 @@ export const SessionTimeoutModal: React.FC<SessionTimeoutModalProps> = ({
               ref={secondaryButtonRef}
               type="button"
               onClick={onSignOut}
-              className="w-full h-[44px] rounded-[10px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center"
+              className="w-full h-[44px] rounded-[12px] bg-transparent hover:bg-white/[0.05] border border-white/[0.12] text-[#E9EDEF] text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center"
             >
               Sign out now
             </button>
@@ -112,7 +112,7 @@ export const SessionTimeoutModal: React.FC<SessionTimeoutModalProps> = ({
               ref={primaryButtonRef}
               type="button"
               onClick={onSignOut}
-              className="w-full h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008f72] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center shadow-sm"
+              className="w-full h-[44px] rounded-[12px] bg-[#00A884] hover:bg-[#008f72] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center shadow-sm"
             >
               Sign in
             </button>

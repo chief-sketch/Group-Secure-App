@@ -85,55 +85,55 @@ export const ForgotPasswordDialog: React.FC<ForgotPasswordDialogProps> = ({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="w-full max-w-[390px] bg-[#1F2C33] rounded-[14px] border border-white/[0.08] shadow-2xl p-6 text-left select-none relative animate-fadeIn outline-none"
+        className="w-full max-w-[390px] bg-[#17232A] rounded-[18px] border border-[#2C3B44] shadow-2xl p-6 text-left select-none relative animate-fadeIn outline-none font-['Montserrat',sans-serif] font-medium"
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[#8696A0] hover:text-[#E9EDEF] hover:bg-white/[0.05] transition-colors cursor-pointer"
+          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[#8FA2AD] hover:text-[#F2F7F9] hover:bg-white/[0.05] focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] transition-colors cursor-pointer"
           aria-label="Close"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="w-11 h-11 rounded-full bg-[#00A884]/15 border border-[#00A884]/30 text-[#00A884] flex items-center justify-center mb-3">
+        <div className="w-11 h-11 rounded-full bg-[#3DDBB4]/15 border border-[#3DDBB4]/30 text-[#3DDBB4] flex items-center justify-center mb-3">
           <KeyRound className="w-5 h-5" strokeWidth={1.75} />
         </div>
 
         <h3
           id="forgot-password-title"
-          className="text-[18px] font-semibold text-[#E9EDEF] title-tracking mb-1"
+          className="text-[18px] font-bold text-white title-tracking mb-1"
         >
           Reset your password
         </h3>
 
-        <p className="text-[13px] text-[#8696A0] leading-relaxed mb-4">
+        <p className="text-[13px] text-[#A9BAC4] leading-relaxed mb-4 font-medium">
           Enter your organization email and we will send you a secure link to reset your password.
         </p>
 
         {submittedMessage ? (
           <div className="flex flex-col gap-4">
-            <div className="p-3.5 bg-[#00A884]/10 border border-[#00A884]/30 rounded-[10px] text-[13px] text-[#E9EDEF] flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-[#00A884] flex-shrink-0 mt-0.5" />
-              <span className="leading-relaxed">{submittedMessage}</span>
+            <div className="p-3.5 bg-[#3DDBB4]/10 border border-[#3DDBB4]/30 rounded-[12px] text-[13px] text-[#F2F7F9] flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-[#3DDBB4] flex-shrink-0 mt-0.5" />
+              <span className="leading-relaxed font-medium">{submittedMessage}</span>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="w-full h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center"
+              className="w-full h-[46px] rounded-[12px] bg-[#2EE0B0] hover:bg-[#28CCA0] text-[#042A21] text-[14px] font-bold transition-all cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#3DDBB4]"
             >
               Done
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-medium text-[#8696A0]">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[13px] font-medium text-[#C9D6DD]">
                 Email address
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8696A0]">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8FA2AD]">
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
@@ -145,19 +145,19 @@ export const ForgotPasswordDialog: React.FC<ForgotPasswordDialogProps> = ({
                     if (emailError) setEmailError(null);
                   }}
                   placeholder="name@organization.com"
-                  className="w-full h-[42px] pl-10 pr-3.5 rounded-[10px] bg-[#2A3942] border border-white/[0.08] text-[#E9EDEF] text-[13px] placeholder-[#8696A0]/75 focus:outline-none focus:border-[#00A884] transition-standard"
+                  className="w-full h-[46px] pl-10 pr-3.5 rounded-[12px] bg-[#22323B] border border-[#3A4C57] text-[#F2F7F9] text-[14px] font-medium placeholder-[#8FA2AD] focus:outline-none focus:ring-2 focus:ring-[#3DDBB4] transition-all"
                 />
               </div>
               {emailError && (
-                <p className="text-[12px] text-[#E5484D] pl-1">{emailError}</p>
+                <p className="text-[12px] text-[#FF6B6B] pl-1 font-medium">{emailError}</p>
               )}
             </div>
 
-            <div className="flex flex-col gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-2">
               <button
                 type="submit"
                 disabled={isSubmitting || cooldown > 0}
-                className="w-full h-[44px] rounded-[10px] bg-[#00A884] hover:bg-[#008F72] disabled:opacity-50 text-white text-[14px] font-medium transition-standard cursor-pointer flex items-center justify-center gap-2"
+                className="w-full h-[46px] rounded-[12px] bg-[#2EE0B0] hover:bg-[#28CCA0] disabled:opacity-50 text-[#042A21] text-[14px] font-bold transition-all cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#3DDBB4]"
               >
                 {isSubmitting ? (
                   <>
@@ -174,7 +174,7 @@ export const ForgotPasswordDialog: React.FC<ForgotPasswordDialogProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full h-[40px] rounded-[10px] bg-transparent hover:bg-white/[0.05] text-[#8696A0] hover:text-[#E9EDEF] text-[13px] font-medium transition-standard cursor-pointer"
+                className="w-full h-[42px] rounded-[12px] bg-transparent hover:bg-white/[0.05] text-[#A9BAC4] hover:text-[#F2F7F9] text-[13px] font-medium transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3DDBB4]"
               >
                 Cancel
               </button>
